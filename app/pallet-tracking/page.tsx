@@ -168,6 +168,13 @@ function PalletTrackingPage() {
       return
     }
 
+    // Find the client_id from the selected order
+    const selectedOrder = orders.find(order => order.id === formData.order_id)
+    if (!selectedOrder) {
+      alert("Selected order not found")
+      return
+    }
+
     try {
       const response = await fetch('/api/pallet-tracking', {
         method: 'POST',
@@ -175,7 +182,8 @@ function PalletTrackingPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          order_id: formData.order_id,
+          client_id: selectedOrder.client_id,
           wooden_pallets_sent: parseInt(formData.wooden_pallets_sent),
           intercalaires_sent: parseInt(formData.intercalaires_sent),
           wooden_pallets_returned: parseInt(formData.wooden_pallets_returned) || 0,
@@ -184,7 +192,8 @@ function PalletTrackingPage() {
           wooden_pallets_bad_condition: parseInt(formData.wooden_pallets_bad_condition) || 0,
           intercalaires_good_condition: parseInt(formData.intercalaires_good_condition) || 0,
           intercalaires_bad_condition: parseInt(formData.intercalaires_bad_condition) || 0,
-          return_date: formData.return_date || null
+          return_date: formData.return_date || null,
+          notes: formData.notes || ""
         })
       })
 

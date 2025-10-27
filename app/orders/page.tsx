@@ -295,11 +295,10 @@ const OrdersPage = () => {
   // Function to fetch client details from database
   const fetchClientDetails = async (clientId: string) => {
     try {
-      // Fetch client details from API
+      // First try to fetch from API
       const response = await fetch(`/api/clients/${clientId}`)
       if (response.ok) {
-        const clientData = await response.json()
-        const client = clientData.client
+        const client = await response.json()
         
         // Find the region for this client
         const region = regions.find(r => r.id === client.region_id)
@@ -322,11 +321,49 @@ const OrdersPage = () => {
         
         return { client, region, city }
       } else {
+        // Fallback to demo data
+        const client = clients.find(c => c.id === clientId)
+        if (client) {
+          const region = regions.find(r => r.id === client.region_id)
+          const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
+          
+          setSelectedClientDetails({
+            client: client,
+            region: region || null,
+            city: city
+          })
+          
+          setFormData(prev => ({
+            ...prev,
+            region_id: client.region_id || ""
+          }))
+          
+          return { client, region, city }
+        }
         console.error('Failed to fetch client details')
         return null
       }
     } catch (error) {
       console.error('Error fetching client details:', error)
+      // Fallback to demo data
+      const client = clients.find(c => c.id === clientId)
+      if (client) {
+        const region = regions.find(r => r.id === client.region_id)
+        const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
+        
+        setSelectedClientDetails({
+          client: client,
+          region: region || null,
+          city: city
+        })
+        
+        setFormData(prev => ({
+          ...prev,
+          region_id: client.region_id || ""
+        }))
+        
+        return { client, region, city }
+      }
       return null
     }
   }
@@ -464,9 +501,9 @@ const OrdersPage = () => {
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
-    if (!formData.client_id || !formData.region_id) {
-      alert("Please select a client and region")
+    // Validation - only require client, region will be auto-assigned
+    if (!formData.client_id) {
+      alert("Please select a client")
       return
     }
 
@@ -481,22 +518,29 @@ const OrdersPage = () => {
     }
 
     try {
+      // Get client details to auto-assign region
+      const clientDetails = await fetchClientDetails(formData.client_id)
+      if (!clientDetails) {
+        alert("Failed to fetch client details")
+        return
+      }
+
       const totalPallets = formData.product_5_5L_pallets + formData.product_1_5L_pallets
       const truckCapacity = totalPallets <= 22 ? 22 : totalPallets <= 24 ? 24 : 26
       
-      // Calculate pricing
-      const product5_5LPrice = formData.product_5_5L_pallets * 212 * 65
-      const product1_5LPrice = formData.product_1_5L_pallets * 112 * 178.5
+      // Calculate pricing - Fixed calculation
+      const product5_5LPrice = formData.product_5_5L_pallets * 212 * 65  // 212 bottles per pallet * 65 DA per bottle
+      const product1_5LPrice = formData.product_1_5L_pallets * 112 * 178.5  // 112 bottles per pallet * 178.5 DA per bottle
       const productTotal = product5_5LPrice + product1_5LPrice
       
-      // Transport cost
-      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(formData.region_id) : 0
+      // Transport cost - Fixed calculation
+      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(clientDetails.client.region_id) : 0
       const totalPrice = productTotal + transportCost
 
       const newOrder: Order = {
         id: `ORD-${Date.now()}`,
         client_id: formData.client_id,
-        region_id: formData.region_id,
+        region_id: clientDetails.client.region_id, // Auto-assigned from client
         assigned_to: "USR-004", // Operations team
         status: "pending" as const,
         total_price: totalPrice,
@@ -508,8 +552,8 @@ const OrdersPage = () => {
         notes: formData.notes,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        clients: clients.find(c => c.id === formData.client_id),
-        regions: regions.find(r => r.id === formData.region_id),
+        clients: clientDetails.client,
+        regions: clientDetails.region,
       }
 
       // Create order via API to ensure persistence
@@ -815,6 +859,70 @@ const OrdersPage = () => {
       console.error("Failed to delete order:", error)
       showDeleteErrorToast('Order', error instanceof Error ? error.message : 'Failed to delete order')
     }
+  }
+
+  const handleApproveOrder = async (order: Order) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          approved_by: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update the order in the list
+        setOrders(prev => prev.map(o => o.id === order.id ? data.order : o))
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to approve order')
+      }
+    } catch (error) {
+      console.error("Failed to approve order:", error)
+      alert('Failed to approve order')
+    }
+  }
+
+  const handleUpdateOrderStatus = async (order: Order, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update_status',
+          status: newStatus
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update the order in the list
+        setOrders(prev => prev.map(o => o.id === order.id ? data.order : o))
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update order status')
+      }
+    } catch (error) {
+      console.error("Failed to update order status:", error)
+      alert('Failed to update order status')
+    }
+  }
+
+  const canApproveOrder = (order: Order) => {
+    return user?.role === 'operations' && order.status === 'pending'
+  }
+
+  const canUpdateOrderStatus = (order: Order) => {
+    return user?.role === 'operations' && ['pending', 'processing', 'in_transit'].includes(order.status)
   }
 
   const handleViewOrder = (order: Order) => {
@@ -1377,6 +1485,7 @@ const OrdersPage = () => {
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">Client</TableHead>
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">Region</TableHead>
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">Status</TableHead>
+                      <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">BL Number</TableHead>
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">Products</TableHead>
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell">Truck</TableHead>
                       <TableHead className="text-gray-900 dark:text-white font-semibold md:table-cell text-right">Total Price</TableHead>
@@ -1455,6 +1564,25 @@ const OrdersPage = () => {
                           </TableCell>
                           
                           <TableCell className="md:table-cell">
+                            {order.bl_number ? (
+                              <div className="space-y-1">
+                                <div className="font-medium text-green-600 dark:text-green-400">
+                                  {order.bl_number}
+                                </div>
+                                {order.approved_at && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    Approved: {new Date(order.approved_at).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-gray-400 dark:text-gray-500 text-sm">
+                                Not assigned
+                              </div>
+                            )}
+                          </TableCell>
+                          
+                          <TableCell className="md:table-cell">
                             <div className="space-y-1">
                               {order.product_5_5L_pallets > 0 && (
                                 <div className="text-sm text-gray-900 dark:text-white">
@@ -1504,6 +1632,28 @@ const OrdersPage = () => {
                                   <Info className="mr-2 h-3 w-3" />
                                   View Details
                                 </DropdownMenuItem>
+                                {canApproveOrder(order) && (
+                                  <DropdownMenuItem onClick={() => handleApproveOrder(order)}>
+                                    <CheckCircle className="mr-2 h-3 w-3" />
+                                    Approve Order
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdateOrderStatus(order) && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleUpdateOrderStatus(order, 'processing')}>
+                                      <Clock className="mr-2 h-3 w-3" />
+                                      Mark as Processing
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateOrderStatus(order, 'in_transit')}>
+                                      <Truck className="mr-2 h-3 w-3" />
+                                      Mark as In Transit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateOrderStatus(order, 'delivered')}>
+                                      <CheckCircle className="mr-2 h-3 w-3" />
+                                      Mark as Delivered
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                                 {canEditOrder(order) && (
                                   <DropdownMenuItem onClick={() => handleEditOrder(order)}>
                                     <Edit className="mr-2 h-3 w-3" />

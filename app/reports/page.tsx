@@ -82,17 +82,70 @@ function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState("30")
   const [chartType, setChartType] = useState("bar")
+  const [filters, setFilters] = useState({
+    client: "all",
+    supervisor: "all", 
+    city: "all",
+    dateRange: "30"
+  })
+  const [clients, setClients] = useState<any[]>([])
+  const [supervisors, setSupervisors] = useState<any[]>([])
 
   useEffect(() => {
     fetchReportData()
-  }, [dateRange])
+    fetchFilterData()
+  }, [dateRange, filters])
+
+  const handleFilterChange = (filterType: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }))
+  }
+
+  const clearFilters = () => {
+    setFilters({
+      client: "all",
+      supervisor: "all", 
+      city: "all",
+      dateRange: "30"
+    })
+  }
+
+  const fetchFilterData = async () => {
+    try {
+      const [clientsRes, supervisorsRes] = await Promise.all([
+        fetch('/api/clients'),
+        fetch('/api/supervisors')
+      ])
+
+      if (clientsRes.ok) {
+        const clientsData = await clientsRes.json()
+        setClients(clientsData.clients || [])
+      }
+
+      if (supervisorsRes.ok) {
+        const supervisorsData = await supervisorsRes.json()
+        setSupervisors(supervisorsData.supervisors || [])
+      }
+    } catch (error) {
+      console.error('Error fetching filter data:', error)
+    }
+  }
 
   const fetchReportData = async () => {
     try {
       setLoading(true)
       
-      // Fetch real-time order data
-      const ordersResponse = await fetch('/api/orders')
+      // Build query parameters based on filters
+      const queryParams = new URLSearchParams()
+      if (filters.client !== "all") queryParams.append('client_id', filters.client)
+      if (filters.supervisor !== "all") queryParams.append('supervisor_id', filters.supervisor)
+      if (filters.city !== "all") queryParams.append('city', filters.city)
+      if (filters.dateRange !== "all") queryParams.append('days', filters.dateRange)
+      
+      // Fetch real-time order data with filters
+      const ordersResponse = await fetch(`/api/orders?${queryParams.toString()}`)
       let ordersData = null
       
       if (ordersResponse.ok) {
@@ -310,6 +363,96 @@ function ReportsPage() {
           <TabsTrigger value="clients">Clients</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
+
+        {/* Filter Controls */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-blue-600" />
+              Filter Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Filter by Client
+                </label>
+                <Select value={filters.client} onValueChange={(value) => handleFilterChange('client', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Clients" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clients</SelectItem>
+                    {clients.map(client => (
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Filter by Supervisor
+                </label>
+                <Select value={filters.supervisor} onValueChange={(value) => handleFilterChange('supervisor', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Supervisors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Supervisors</SelectItem>
+                    {supervisors.map(supervisor => (
+                      <SelectItem key={supervisor.id} value={supervisor.id}>{supervisor.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Filter by City
+                </label>
+                <Select value={filters.city} onValueChange={(value) => handleFilterChange('city', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Cities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Cities</SelectItem>
+                    <SelectItem value="Biskra">Biskra</SelectItem>
+                    <SelectItem value="Ouled Djellal">Ouled Djellal</SelectItem>
+                    <SelectItem value="Oued Souf">Oued Souf</SelectItem>
+                    <SelectItem value="El Mghair">El Mghair</SelectItem>
+                    <SelectItem value="Tolga">Tolga</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Date Range
+                </label>
+                <Select value={filters.dateRange} onValueChange={(value) => handleFilterChange('dateRange', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Last 30 days" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                    <SelectItem value="365">Last year</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <TabsContent value="analytics" className="space-y-6">
           <AdvancedAnalytics />

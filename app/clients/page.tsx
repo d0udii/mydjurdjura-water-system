@@ -73,25 +73,20 @@ function ClientsPage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [clientsRes, supervisorsRes, regionsRes] = await Promise.all([
+      const [clientsRes, supervisorsRes] = await Promise.all([
         fetch('/api/clients'),
-        fetch('/api/supervisors'),
-        fetch('/api/regions')
+        fetch('/api/supervisors')
       ])
 
       if (clientsRes.ok) {
-      const clientsData = await clientsRes.json()
+        const clientsData = await clientsRes.json()
         setClients(clientsData.clients || [])
+        setRegions(clientsData.regions || [])
       }
 
       if (supervisorsRes.ok) {
-      const supervisorsData = await supervisorsRes.json()
+        const supervisorsData = await supervisorsRes.json()
         setSupervisors(supervisorsData.supervisors || [])
-      }
-
-      if (regionsRes.ok) {
-        const regionsData = await regionsRes.json()
-        setRegions(regionsData.regions || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)

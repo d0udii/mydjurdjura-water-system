@@ -38,7 +38,10 @@ export default function LoginPage() {
       if (error) {
         setError(error)
       } else {
-        router.push("/dashboard")
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 100)
       }
     } catch (err) {
       setError("An error occurred. Please try again.")

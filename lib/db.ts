@@ -1,5 +1,5 @@
-// In-memory database for the water distribution system
-// This will be replaced with a real database in production
+// Database functions for the water distribution system
+// Using in-memory database for demo purposes
 
 export interface User {
   id: string

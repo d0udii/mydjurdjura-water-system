@@ -1,7 +1,6 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
 interface AuthUser {
@@ -29,66 +28,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (authUser) {
-        // Get user details from our users table
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', authUser.email)
-          .single()
-
-        if (error) {
-          console.error('Error fetching user data:', error)
-          setUser(null)
-        } else {
-          setUser(userData)
-        }
-      } else {
-        setUser(null)
+      // Check if user is already logged in from localStorage
+      const savedUser = localStorage.getItem('djurdjura_user')
+      if (savedUser) {
+        const userData = JSON.parse(savedUser)
+        setUser(userData)
       }
+      setLoading(false)
     } catch (error) {
       console.error('Error refreshing user:', error)
       setUser(null)
-    } finally {
       setLoading(false)
     }
   }
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Demo mode - check against hardcoded credentials
+      // For demo purposes, we'll use a simple password check
+      // In production, you should use Supabase Auth properly
       const demoUsers = {
         'admin@djurdjura.dz': { password: 'admin123', role: 'admin', name: 'Admin Djurdjura' },
-        'hamouch@djurdjura.dz': { password: 'chef123', role: 'regional_manager', name: 'Hamouch', region_id: '550e8400-e29b-41d4-a716-446655440001' },
-        'mahmoud@djurdjura.dz': { password: 'supervisor123', role: 'supervisor', name: 'Mahmoud Djouadi', region_id: '550e8400-e29b-41d4-a716-446655440001' },
-        'operations@djurdjura.dz': { password: 'operations123', role: 'operations', name: 'Operations Team' }
+        'hamouch@djurdjura.dz': { password: 'admin123', role: 'regional_manager', name: 'Hamouch', region_id: '550e8400-e29b-41d4-a716-446655440001' },
+        'mahmoud@djurdjura.dz': { password: 'admin123', role: 'supervisor', name: 'Mahmoud Djouadi', region_id: '550e8400-e29b-41d4-a716-446655440001' },
+        'operations@djurdjura.dz': { password: 'admin123', role: 'operations', name: 'Operations Team' }
       }
 
       const user = demoUsers[email as keyof typeof demoUsers]
       
       if (user && user.password === password) {
-        // Set demo user data
-        setUser({
+        // Set demo user data directly (bypassing database for now)
+        const userData = {
           id: 'demo-' + email,
           name: user.name,
           email: email,
           role: user.role as any,
           region_id: user.region_id,
-          status: 'active'
-        })
+          status: 'active' as const
+        }
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('djurdjura_user', JSON.stringify(userData))
+        setUser(userData)
         return { error: null }
       }
 
       return { error: 'Invalid email or password' }
     } catch (error) {
+      console.error('Sign in error:', error)
       return { error: 'An unexpected error occurred' }
     }
   }
 
   const signOut = async () => {
     try {
+      localStorage.removeItem('djurdjura_user')
       setUser(null)
     } catch (error) {
       console.error('Error signing out:', error)
@@ -96,8 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Demo mode - just set loading to false
-    setLoading(false)
+    refreshUser()
   }, [])
 
   const value = {

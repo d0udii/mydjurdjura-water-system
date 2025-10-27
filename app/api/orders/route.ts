@@ -35,7 +35,7 @@ function calculatePromotionDiscount(order: any, promotions: any[]): number {
 }
 
 // Demo orders data (in production, this would be in a database)
-let demoOrders = [
+export let demoOrders = [
   {
     id: "ORD-001",
     client_id: "CLI-001",
@@ -49,6 +49,9 @@ let demoOrders = [
     truck_capacity: 22,
     delivery_date: "2024-01-15",
     notes: "Urgent delivery",
+    bl_number: null,
+    approved_by: null,
+    approved_at: null,
     created_at: "2024-01-10T10:00:00Z",
     updated_at: "2024-01-10T10:00:00Z",
     clients: {
@@ -82,8 +85,11 @@ let demoOrders = [
     truck_capacity: 24,
     delivery_date: "2024-01-16",
     notes: "Regular delivery",
+    bl_number: "BL-2024-001",
+    approved_by: "USR-004",
+    approved_at: "2024-01-08T15:30:00Z",
     created_at: "2024-01-08T14:30:00Z",
-    updated_at: "2024-01-08T14:30:00Z",
+    updated_at: "2024-01-08T15:30:00Z",
     clients: {
       id: "CLI-002",
       name: "Ouled Djellal Store",
@@ -115,6 +121,9 @@ let demoOrders = [
     truck_capacity: 26,
     delivery_date: "2024-01-01",
     notes: "Completed",
+    bl_number: "BL-2024-002",
+    approved_by: "USR-004",
+    approved_at: "2024-01-01T09:00:00Z",
     created_at: "2024-01-01T08:00:00Z",
     updated_at: "2024-01-01T08:00:00Z",
     clients: {
@@ -139,7 +148,44 @@ let demoOrders = [
 
 export async function POST(request: NextRequest) {
   try {
-    const orderData = await request.json()
+    let orderData
+    try {
+      orderData = await request.json()
+    } catch (jsonError) {
+      return NextResponse.json(
+        { error: 'Invalid JSON format' },
+        { status: 400 }
+      )
+    }
+    
+    // Validation
+    if (!orderData.client_id || orderData.client_id.trim() === '') {
+      return NextResponse.json(
+        { error: 'Client ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (!orderData.product_5_5L_pallets && !orderData.product_1_5L_pallets) {
+      return NextResponse.json(
+        { error: 'At least one product quantity is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (orderData.product_5_5L_pallets < 0 || orderData.product_1_5L_pallets < 0) {
+      return NextResponse.json(
+        { error: 'Product quantities cannot be negative' },
+        { status: 400 }
+      )
+    }
+    
+    if (!['factory', 'client_own'].includes(orderData.truck_type)) {
+      return NextResponse.json(
+        { error: 'Invalid truck type' },
+        { status: 400 }
+      )
+    }
     
     // Generate new order ID
     const newOrderId = `ORD-${Date.now()}`
@@ -158,6 +204,9 @@ export async function POST(request: NextRequest) {
       truck_capacity: orderData.truck_capacity,
       delivery_date: orderData.delivery_date,
       notes: orderData.notes || "",
+      bl_number: null,
+      approved_by: null,
+      approved_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: orderData.created_by || 'unknown',

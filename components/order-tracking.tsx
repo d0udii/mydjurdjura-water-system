@@ -52,6 +52,12 @@ interface OrderTrackingData {
   estimated_delivery: string
   actual_delivery?: string
   notes?: string
+  // Payment tracking fields
+  payment_status: 'unpaid' | 'partial' | 'paid'
+  amount_paid: number
+  payment_date?: string
+  payment_method?: string
+  payment_notes?: string
 }
 
 interface TrackingEvent {
@@ -89,7 +95,13 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, className
           estimated_delivery: calculateEstimatedDelivery(order),
           assigned_driver: getAssignedDriver(order.id),
           driver_phone: getDriverPhone(order.id),
-          bl_number: getBLNumber(order.id)
+          bl_number: getBLNumber(order.id),
+          // Add payment tracking data
+          payment_status: order.payment_status || 'unpaid',
+          amount_paid: order.amount_paid || 0,
+          payment_date: order.payment_date,
+          payment_method: order.payment_method,
+          payment_notes: order.payment_notes
         }))
         setOrders(ordersWithTracking)
         
@@ -461,6 +473,88 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, className
                     </Button>
                   )}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Tracking */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-green-600" />
+                Payment Tracking
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</label>
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                    {selectedOrder.total_price.toLocaleString()} DA
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Amount Paid</label>
+                  <div className="text-lg font-bold text-green-600">
+                    {selectedOrder.amount_paid.toLocaleString()} DA
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Status</label>
+                <div className="mt-1">
+                  <Badge 
+                    variant={
+                      selectedOrder.payment_status === 'paid' ? 'default' : 
+                      selectedOrder.payment_status === 'partial' ? 'secondary' : 
+                      'destructive'
+                    }
+                    className="text-sm"
+                  >
+                    {selectedOrder.payment_status === 'paid' ? '✅ Paid' : 
+                     selectedOrder.payment_status === 'partial' ? '⚠️ Partial' : 
+                     '❌ Unpaid'}
+                  </Badge>
+                </div>
+              </div>
+
+              {selectedOrder.payment_status !== 'unpaid' && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Date</label>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {selectedOrder.payment_date ? new Date(selectedOrder.payment_date).toLocaleDateString() : 'Not specified'}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Method</label>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {selectedOrder.payment_method || 'Not specified'}
+                    </div>
+                  </div>
+                  {selectedOrder.payment_notes && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Notes</label>
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {selectedOrder.payment_notes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Remaining Balance</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {(selectedOrder.total_price - selectedOrder.amount_paid).toLocaleString()} DA
+                  </span>
+                </div>
+                <Progress 
+                  value={(selectedOrder.amount_paid / selectedOrder.total_price) * 100} 
+                  className="h-2 mt-2" 
+                />
               </div>
             </CardContent>
           </Card>

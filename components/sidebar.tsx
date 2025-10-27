@@ -242,7 +242,7 @@ export function Sidebar() {
             </div>
           </RevealOnScroll>
 
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
             {visibleItems.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href

@@ -18,7 +18,7 @@ import {
   HardDrive,
   Cloud,
   Archive,
-  Restore,
+  RotateCcw,
   Settings,
   Calendar,
   FileText,
@@ -26,8 +26,7 @@ import {
   Trash2,
   Eye,
   Play,
-  Pause,
-  RotateCcw
+  Pause
 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
@@ -537,7 +536,7 @@ export const BackupSystem: React.FC<BackupSystemProps> = ({ className }) => {
                     onClick={() => restoreBackup(backup.id)}
                     disabled={isRestoring || backup.status !== 'completed'}
                   >
-                    <Restore className="h-4 w-4 mr-2" />
+                    <RotateCcw className="h-4 w-4 mr-2" />
                     Restore
                   </Button>
                   <Button 
