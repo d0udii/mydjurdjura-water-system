@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { demoOrders } from '../route'
+import { getOrderById, updateOrder as updateSharedOrder, getAllOrders } from '@/lib/shared-api-data'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const order = demoOrders.find(o => o.id === params.id)
+    const { id } = await params
+    const order = getOrderById(id)
 
     if (!order) {
       return NextResponse.json(
@@ -15,7 +16,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ order })
+    return NextResponse.json(order)
   } catch (error) {
     console.error('Error fetching order:', error)
     return NextResponse.json(
@@ -27,21 +28,20 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const { action, bl_number, approved_by } = body
-    const orderIndex = demoOrders.findIndex(o => o.id === params.id)
+    const order = getOrderById(id)
 
-    if (orderIndex === -1) {
+    if (!order) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
       )
     }
-
-    const order = demoOrders[orderIndex]
 
     if (action === 'approve') {
       // Generate BL number if not provided
@@ -57,7 +57,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      demoOrders[orderIndex] = updatedOrder
+      updateSharedOrder(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = {
@@ -93,7 +93,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      demoOrders[orderIndex] = updatedOrder
+      updateSharedOrder(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = {
@@ -132,7 +132,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const orderIndex = demoOrders.findIndex(o => o.id === params.id)
+    const orderIndex = getAllOrders().findIndex(o => o.id === id)
 
     if (orderIndex === -1) {
       return NextResponse.json(
@@ -166,7 +166,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const orderIndex = demoOrders.findIndex(o => o.id === params.id)
+    const orderIndex = getAllOrders().findIndex(o => o.id === id)
 
     if (orderIndex === -1) {
       return NextResponse.json(

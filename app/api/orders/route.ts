@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sharedOrders, addOrder, updateOrder, getAllOrders } from '@/lib/shared-api-data'
 import { createOrderNotification } from '../notifications/route'
 
 // Helper function to calculate promotion discount
@@ -226,7 +227,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Add to demo orders array (in production, this would be saved to database)
-    demoOrders.unshift(newOrder)
+    // Add to shared data store
+    addOrder(newOrder)
     
     // Create automatic notifications
     const notifications = createOrderNotification(newOrder, orderData.created_by || 'unknown')
@@ -249,13 +251,13 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     return NextResponse.json({ 
-      orders: demoOrders,
+      orders: getAllOrders(),
       stats: {
-        totalOrders: demoOrders.length,
-        pendingOrders: demoOrders.filter(o => o.status === 'pending').length,
-        inProgressOrders: demoOrders.filter(o => o.status === 'in_progress').length,
-        deliveredOrders: demoOrders.filter(o => o.status === 'delivered').length,
-        totalRevenue: demoOrders.reduce((sum, o) => sum + o.total_price, 0)
+        totalOrders: getAllOrders().length,
+        pendingOrders: getAllOrders().filter(o => o.status === 'pending').length,
+        inProgressOrders: getAllOrders().filter(o => o.status === 'in_progress').length,
+        deliveredOrders: getAllOrders().filter(o => o.status === 'delivered').length,
+        totalRevenue: getAllOrders().reduce((sum, o) => sum + o.total_price, 0)
       }
     })
   } catch (error) {

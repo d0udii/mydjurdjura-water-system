@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAllOrders } from '@/lib/shared-api-data'
 
 // Demo BL numbers data (in production, this would be in a database)
 let demoBLNumbers = [
@@ -28,7 +29,27 @@ export async function GET(request: NextRequest) {
     const orderId = searchParams.get('order_id')
     const status = searchParams.get('status')
     
-    let filteredBLNumbers = demoBLNumbers
+    // Get BL numbers from orders that have them
+    const ordersWithBL = getAllOrders().filter(order => order.bl_number)
+    const blNumbersFromOrders = ordersWithBL.map(order => ({
+      id: `BL-${order.id}`,
+      order_id: order.id,
+      bl_number: order.bl_number,
+      created_at: order.approved_at || order.created_at,
+      created_by: order.approved_by || 'USR-004',
+      status: order.status === 'delivered' ? 'inactive' : 'active',
+      notes: `Auto-generated BL number for order ${order.id}`
+    }))
+    
+    // Combine with existing BL numbers
+    let allBLNumbers = [...demoBLNumbers, ...blNumbersFromOrders]
+    
+    // Remove duplicates based on bl_number
+    const uniqueBLNumbers = allBLNumbers.filter((bl, index, self) => 
+      index === self.findIndex(b => b.bl_number === bl.bl_number)
+    )
+    
+    let filteredBLNumbers = uniqueBLNumbers
     
     if (orderId) {
       filteredBLNumbers = filteredBLNumbers.filter(bl => bl.order_id === orderId)
