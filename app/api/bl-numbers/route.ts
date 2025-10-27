@@ -1,45 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Mock BL numbers storage (in production, this would be in Supabase)
-let blNumbers: any[] = [
+// Demo BL numbers data (in production, this would be in a database)
+let demoBLNumbers = [
   {
     id: "BL-001",
-    order_id: "ORD-001",
-    bl_number: "BL2024001",
-    created_at: "2024-01-01T00:00:00Z",
+    order_id: "ORD-002",
+    bl_number: "BL-2024-001",
+    created_at: "2024-01-08T15:30:00Z",
     created_by: "USR-004",
     status: "active",
-    notes: "Initial BL number"
+    notes: "BL number for Ouled Djellal Store order"
+  },
+  {
+    id: "BL-002",
+    order_id: "ORD-003",
+    bl_number: "BL-2024-002",
+    created_at: "2024-01-01T09:00:00Z",
+    created_by: "USR-004",
+    status: "active",
+    notes: "BL number for Oued Souf Market order"
   }
 ]
-
-// Generate unique BL number
-function generateBLNumber(): string {
-  const year = new Date().getFullYear()
-  const existingNumbers = blNumbers.map(bl => bl.bl_number)
-  
-  let counter = 1
-  let newBLNumber: string
-  
-  do {
-    newBLNumber = `BL${year}${counter.toString().padStart(3, '0')}`
-    counter++
-  } while (existingNumbers.includes(newBLNumber))
-  
-  return newBLNumber
-}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const orderId = searchParams.get('order_id')
+    const status = searchParams.get('status')
+    
+    let filteredBLNumbers = demoBLNumbers
     
     if (orderId) {
-      const blNumber = blNumbers.find(bl => bl.order_id === orderId)
-      return NextResponse.json({ blNumber })
+      filteredBLNumbers = filteredBLNumbers.filter(bl => bl.order_id === orderId)
     }
     
-    return NextResponse.json({ blNumbers })
+    if (status) {
+      filteredBLNumbers = filteredBLNumbers.filter(bl => bl.status === status)
+    }
+    
+    return NextResponse.json({ blNumbers: filteredBLNumbers })
   } catch (error) {
     console.error('Error fetching BL numbers:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -49,39 +48,48 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const { order_id, notes, created_by } = data
+    const { order_id, bl_number, notes, created_by } = data
     
-    if (!order_id) {
+    // Validation
+    if (!order_id || !bl_number) {
       return NextResponse.json(
-        { error: 'Order ID is required' },
+        { error: 'Order ID and BL number are required' },
         { status: 400 }
       )
     }
     
-    // Check if BL number already exists for this order
-    const existingBL = blNumbers.find(bl => bl.order_id === order_id)
+    // Check if BL number already exists
+    const existingBL = demoBLNumbers.find(bl => bl.bl_number === bl_number)
     if (existingBL) {
       return NextResponse.json(
-        { error: 'BL number already exists for this order' },
+        { error: 'BL number already exists' },
         { status: 400 }
       )
     }
     
-    const newBLNumber = generateBLNumber()
-    const newBL = {
-      id: `BL-${String(Date.now()).slice(-6)}`,
-      order_id,
-      bl_number: newBLNumber,
-      created_at: new Date().toISOString(),
-      created_by: created_by || "USR-004",
-      status: "active",
-      notes: notes || ""
+    // Check if order already has a BL number
+    const existingOrderBL = demoBLNumbers.find(bl => bl.order_id === order_id)
+    if (existingOrderBL) {
+      return NextResponse.json(
+        { error: 'Order already has a BL number' },
+        { status: 400 }
+      )
     }
     
-    blNumbers.push(newBL)
+    const newBLNumber = {
+      id: `BL-${String(Date.now()).slice(-6)}`,
+      order_id,
+      bl_number,
+      created_at: new Date().toISOString(),
+      created_by: created_by || 'USR-004',
+      status: 'active' as const,
+      notes: notes || ''
+    }
+    
+    demoBLNumbers.push(newBLNumber)
     
     return NextResponse.json({ 
-      blNumber: newBL, 
+      blNumber: newBLNumber, 
       message: "BL number created successfully" 
     }, { status: 201 })
   } catch (error) {
@@ -95,7 +103,7 @@ export async function PUT(request: NextRequest) {
     const data = await request.json()
     const { id, bl_number, notes, status } = data
     
-    const blIndex = blNumbers.findIndex(bl => bl.id === id)
+    const blIndex = demoBLNumbers.findIndex(bl => bl.id === id)
     if (blIndex === -1) {
       return NextResponse.json(
         { error: 'BL number not found' },
@@ -103,9 +111,9 @@ export async function PUT(request: NextRequest) {
       )
     }
     
-    // Check if BL number is unique (if being updated)
-    if (bl_number && bl_number !== blNumbers[blIndex].bl_number) {
-      const existingBL = blNumbers.find(bl => bl.bl_number === bl_number && bl.id !== id)
+    // Check if new BL number already exists (if changing)
+    if (bl_number && bl_number !== demoBLNumbers[blIndex].bl_number) {
+      const existingBL = demoBLNumbers.find(bl => bl.bl_number === bl_number && bl.id !== id)
       if (existingBL) {
         return NextResponse.json(
           { error: 'BL number already exists' },
@@ -114,16 +122,19 @@ export async function PUT(request: NextRequest) {
       }
     }
     
-    blNumbers[blIndex] = {
-      ...blNumbers[blIndex],
-      bl_number: bl_number || blNumbers[blIndex].bl_number,
-      notes: notes || blNumbers[blIndex].notes,
-      status: status || blNumbers[blIndex].status,
+    // Update BL number
+    const updatedBLNumber = {
+      ...demoBLNumbers[blIndex],
+      bl_number: bl_number || demoBLNumbers[blIndex].bl_number,
+      notes: notes || demoBLNumbers[blIndex].notes,
+      status: status || demoBLNumbers[blIndex].status,
       updated_at: new Date().toISOString()
     }
     
+    demoBLNumbers[blIndex] = updatedBLNumber
+    
     return NextResponse.json({ 
-      blNumber: blNumbers[blIndex], 
+      blNumber: updatedBLNumber, 
       message: "BL number updated successfully" 
     })
   } catch (error) {
@@ -144,7 +155,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
     
-    const blIndex = blNumbers.findIndex(bl => bl.id === id)
+    const blIndex = demoBLNumbers.findIndex(bl => bl.id === id)
     if (blIndex === -1) {
       return NextResponse.json(
         { error: 'BL number not found' },
@@ -152,10 +163,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
     
-    blNumbers.splice(blIndex, 1)
+    const deletedBLNumber = demoBLNumbers[blIndex]
+    demoBLNumbers.splice(blIndex, 1)
     
     return NextResponse.json({ 
-      message: "BL number deleted successfully" 
+      message: "BL number deleted successfully",
+      blNumber: deletedBLNumber
     })
   } catch (error) {
     console.error('Error deleting BL number:', error)

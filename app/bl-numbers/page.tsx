@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Edit, Trash2, MoreHorizontal, Download, FileText, Search, Filter, RefreshCw, Package, Truck } from "lucide-react"
+import { useDataStore } from "@/lib/shared-data-store"
 
 // Mock auth hook for demo
 const useAuth = () => ({
@@ -43,8 +43,7 @@ interface Order {
 
 function BLNumbersPage() {
   const { user } = useAuth()
-  const [blNumbers, setBlNumbers] = useState<BLNumber[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
+  const { orders, blNumbers, addBLNumber, updateBLNumber, refreshData } = useDataStore()
   const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -102,13 +101,45 @@ function BLNumbersPage() {
   ]
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
+    fetchData()
+    
+    // Set up real-time updates every 5 seconds
+    const interval = setInterval(() => {
+      fetchData()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch orders from API
+      const ordersResponse = await fetch('/api/orders')
+      if (ordersResponse.ok) {
+        const ordersData = await ordersResponse.json()
+        setOrders(ordersData.orders || [])
+      }
+      
+      // Fetch BL numbers from API
+      const blResponse = await fetch('/api/bl-numbers')
+      if (blResponse.ok) {
+        const blData = await blResponse.json()
+        setBlNumbers(blData.blNumbers || [])
+      } else {
+        // Fallback to demo data if API doesn't exist yet
+        setBlNumbers(demoBLNumbers)
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      // Fallback to demo data
       setBlNumbers(demoBLNumbers)
       setOrders(demoOrders)
+    } finally {
       setLoading(false)
-    }, 1000)
-  }, [])
+    }
+  }
 
   const handleCreateBL = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -131,16 +162,17 @@ function BLNumbersPage() {
         })
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setBlNumbers(prev => [data.blNumber, ...prev])
-        setIsCreateOpen(false)
-        resetForm()
-        alert(data.message)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to create BL number')
-      }
+        if (response.ok) {
+          const data = await response.json()
+          // Add to shared data store for real-time updates
+          addBLNumber(data.blNumber)
+          setIsCreateOpen(false)
+          resetForm()
+          alert(data.message)
+        } else {
+          const error = await response.json()
+          alert(error.error || 'Failed to create BL number')
+        }
     } catch (error) {
       console.error("Failed to create BL number:", error)
       alert('Failed to create BL number')

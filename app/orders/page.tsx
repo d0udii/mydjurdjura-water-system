@@ -29,7 +29,7 @@ import {
   RevealTableRow,
   ShakeElement
 } from "@/components/animations"
-import { useAuth, withAuth } from "@/lib/auth"
+import { useDataStore } from "@/lib/shared-data-store"
 
 // Loading Spinner Component
 const LoadingSpinner = ({ text, subtext }: { text: string; subtext?: string }) => (
@@ -151,8 +151,7 @@ interface TransportTariff {
 
 const OrdersPage = () => {
   const { user } = useAuth()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const { orders, clients, addOrder, updateOrder, refreshData } = useDataStore()
   const [regions, setRegions] = useState<Region[]>([])
   const [transportTariffs, setTransportTariffs] = useState<TransportTariff[]>([])
   const [loading, setLoading] = useState(true)
@@ -600,8 +599,8 @@ const OrdersPage = () => {
 
       const createdOrder = await response.json()
       
-      // Update local state immediately for real-time UI update
-      setOrders(prev => [createdOrder.order, ...prev])
+      // Add to shared data store for real-time updates across all components
+      addOrder(createdOrder.order)
       
       // Send notifications to relevant users
       await sendOrderNotifications(createdOrder.order)
@@ -899,15 +898,15 @@ const OrdersPage = () => {
         })
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // Update the order in the list
-        setOrders(prev => prev.map(o => o.id === order.id ? data.order : o))
-        alert(data.message)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to approve order')
-      }
+        if (response.ok) {
+          const data = await response.json()
+          // Update the order in shared data store
+          updateOrder(order.id, data.order)
+          alert(data.message)
+        } else {
+          const error = await response.json()
+          alert(error.error || 'Failed to approve order')
+        }
     } catch (error) {
       console.error("Failed to approve order:", error)
       alert('Failed to approve order')
@@ -927,15 +926,15 @@ const OrdersPage = () => {
         })
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // Update the order in the list
-        setOrders(prev => prev.map(o => o.id === order.id ? data.order : o))
-        alert(data.message)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to update order status')
-      }
+        if (response.ok) {
+          const data = await response.json()
+          // Update the order in shared data store
+          updateOrder(order.id, data.order)
+          alert(data.message)
+        } else {
+          const error = await response.json()
+          alert(error.error || 'Failed to update order status')
+        }
     } catch (error) {
       console.error("Failed to update order status:", error)
       alert('Failed to update order status')

@@ -277,8 +277,8 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, className
   useEffect(() => {
     fetchOrders()
     
-    // Real-time updates every 30 seconds
-    const interval = setInterval(fetchOrders, 30000)
+    // Real-time updates every 10 seconds for better responsiveness
+    const interval = setInterval(fetchOrders, 10000)
     
     return () => clearInterval(interval)
   }, [orderId])
