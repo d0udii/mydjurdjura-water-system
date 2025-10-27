@@ -1,0 +1,964 @@
+"use client"
+
+import React, { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Edit2, Trash2, Search, Filter, Download, Upload, Package, DollarSign, Layers, TrendingUp, Eye, MoreHorizontal, CheckCircle, XCircle, Clock, Crown, Shield, Zap, Lock, Unlock } from "lucide-react"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
+import { format } from "date-fns"
+
+interface Product {
+  id: string
+  name: string
+  volume: string
+  units_per_pallet: number
+  unit_price: number
+  status: 'active' | 'inactive' | 'discontinued'
+  created_at: string
+  updated_at: string
+}
+
+function ProductsPage() {
+  const { user } = useAuth()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [formData, setFormData] = useState({
+    name: "",
+    volume: "",
+    units_per_pallet: "",
+    unit_price: "",
+    status: "active" as 'active' | 'inactive' | 'discontinued'
+  })
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      
+      // Demo data
+      const demoProducts: Product[] = [
+        {
+          id: "PRD-001",
+          name: "Djurdjura Natural Water",
+          volume: "5.5L",
+          units_per_pallet: 144,
+          unit_price: 45.00,
+          status: "active",
+          created_at: "2024-01-01T10:00:00Z",
+          updated_at: "2024-01-01T10:00:00Z"
+        },
+        {
+          id: "PRD-002",
+          name: "Djurdjura Sparkling Water",
+          volume: "1.5L",
+          units_per_pallet: 200,
+          unit_price: 35.00,
+          status: "active",
+          created_at: "2024-01-02T14:30:00Z",
+          updated_at: "2024-01-02T14:30:00Z"
+        },
+        {
+          id: "PRD-003",
+          name: "Djurdjura Premium Water",
+          volume: "0.5L",
+          units_per_pallet: 400,
+          unit_price: 25.00,
+          status: "active",
+          created_at: "2024-01-03T08:15:00Z",
+          updated_at: "2024-01-03T08:15:00Z"
+        },
+        {
+          id: "PRD-004",
+          name: "Djurdjura Family Pack",
+          volume: "10L",
+          units_per_pallet: 72,
+          unit_price: 85.00,
+          status: "active",
+          created_at: "2024-01-04T11:45:00Z",
+          updated_at: "2024-01-04T11:45:00Z"
+        },
+        {
+          id: "PRD-005",
+          name: "Djurdjura Office Water",
+          volume: "18.9L",
+          units_per_pallet: 40,
+          unit_price: 120.00,
+          status: "inactive",
+          created_at: "2024-01-05T16:20:00Z",
+          updated_at: "2024-01-05T16:20:00Z"
+        },
+        {
+          id: "PRD-006",
+          name: "Djurdjura Classic Water",
+          volume: "2L",
+          units_per_pallet: 150,
+          unit_price: 30.00,
+          status: "discontinued",
+          created_at: "2024-01-06T09:30:00Z",
+          updated_at: "2024-01-06T09:30:00Z"
+        }
+      ]
+
+      setProducts(demoProducts)
+    } catch (error) {
+      console.error("Failed to fetch data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.name || !formData.volume || !formData.units_per_pallet || !formData.unit_price) {
+      alert("Please fill all required fields")
+      return
+    }
+
+    try {
+      const newProduct: Product = {
+        id: `PRD-${String(products.length + 1).padStart(3, '0')}`,
+        name: formData.name,
+        volume: formData.volume,
+        units_per_pallet: parseInt(formData.units_per_pallet),
+        unit_price: parseFloat(formData.unit_price),
+        status: formData.status,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      setProducts(prev => [newProduct, ...prev])
+      setIsCreateOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error("Failed to create product:", error)
+    }
+  }
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedProduct) return
+
+    try {
+      const updatedProduct = {
+        ...selectedProduct,
+        name: formData.name,
+        volume: formData.volume,
+        units_per_pallet: parseInt(formData.units_per_pallet),
+        unit_price: parseFloat(formData.unit_price),
+        status: formData.status,
+        updated_at: new Date().toISOString()
+      }
+
+      setProducts(prev => prev.map(product => 
+        product.id === selectedProduct.id ? updatedProduct : product
+      ))
+      
+      setIsEditOpen(false)
+      setSelectedProduct(null)
+      resetForm()
+    } catch (error) {
+      console.error("Failed to update product:", error)
+    }
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      setProducts(prev => prev.filter(product => product.id !== id))
+    } catch (error) {
+      console.error("Failed to delete product:", error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      volume: "",
+      units_per_pallet: "",
+      unit_price: "",
+      status: "active"
+    })
+  }
+
+  const handleEdit = (product: Product) => {
+    setFormData({
+      name: product.name,
+      volume: product.volume,
+      units_per_pallet: product.units_per_pallet.toString(),
+      unit_price: product.unit_price.toString(),
+      status: product.status
+    })
+    setSelectedProduct(product)
+    setIsEditOpen(true)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "inactive":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      case "discontinued":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      default:
+        return "bg-slate-100 text-slate-800"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "active":
+        return <CheckCircle className="h-4 w-4" />
+      case "inactive":
+        return <Clock className="h-4 w-4" />
+      case "discontinued":
+        return <XCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.volume.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === "all" || product.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
+
+  const activeProducts = filteredProducts.filter(p => p.status === 'active')
+  const inactiveProducts = filteredProducts.filter(p => p.status === 'inactive')
+  const discontinuedProducts = filteredProducts.filter(p => p.status === 'discontinued')
+
+  const canManageProducts = user?.role === "admin"
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 md:p-8 space-y-6">
+      {/* Enhanced Header with Admin Controls */}
+      <div className={`${user?.role === 'admin' ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'} rounded-lg border p-6`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 ${user?.role === 'admin' ? 'bg-red-100 dark:bg-red-900' : 'bg-blue-100 dark:bg-blue-900'} rounded-lg`}>
+              {user?.role === 'admin' ? (
+                <Crown className="h-8 w-8 text-red-600 dark:text-red-400" />
+              ) : (
+                <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              )}
+            </div>
+        <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Products Management</h1>
+                {user?.role === 'admin' && (
+                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-3 py-1 text-sm font-bold">
+                    <Shield className="h-4 w-4 mr-1" />
+                    ADMIN
+                  </Badge>
+                )}
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {user?.role === 'admin' 
+                  ? "Full administrative control over all products, pricing, and system configurations"
+                  : "Manage water products, pricing, and inventory"
+                }
+              </p>
+              {user?.role === 'admin' && (
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Zap className="h-4 w-4" />
+                    <span className="font-medium">Override All Restrictions</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-medium">Full System Control</span>
+                  </div>
+                </div>
+              )}
+            </div>
+        </div>
+          
+          {canManageProducts && (
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+                <Button className={`w-full md:w-auto ${user?.role === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`} onClick={resetForm}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Add New Product</DialogTitle>
+            </DialogHeader>
+              <form onSubmit={handleCreateProduct} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                    <Label htmlFor="name">Product Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                    <Label htmlFor="volume">Volume *</Label>
+                <Input
+                  id="volume"
+                  value={formData.volume}
+                  onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                      placeholder="e.g., 5.5L, 1.5L"
+                  required
+                />
+                  </div>
+              </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                    <Label htmlFor="units_per_pallet">Units Per Pallet *</Label>
+                <Input
+                      id="units_per_pallet"
+                  type="number"
+                      min="1"
+                      value={formData.units_per_pallet}
+                      onChange={(e) => setFormData({ ...formData, units_per_pallet: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                    <Label htmlFor="unit_price">Unit Price (DA) *</Label>
+                <Input
+                      id="unit_price"
+                  type="number"
+                      min="0"
+                  step="0.01"
+                      value={formData.unit_price}
+                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                  required
+                />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <select
+                    id="status"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                  </select>
+              </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    Add Product
+              </Button>
+                </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+        )}
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+            <Package className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{products.length}</div>
+            <p className="text-xs text-slate-500">All products</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Products</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{products.filter(p => p.status === 'active').length}</div>
+            <p className="text-xs text-slate-500">Currently active</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Price</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {(products.reduce((sum, p) => sum + p.unit_price, 0) / products.length).toFixed(2)} DA
+            </div>
+            <p className="text-xs text-slate-500">Per unit</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Units</CardTitle>
+            <Layers className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {products.reduce((sum, p) => sum + p.units_per_pallet, 0).toLocaleString()}
+            </div>
+            <p className="text-xs text-slate-500">Per pallet capacity</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters & Search
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search products by name or volume..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="discontinued">Discontinued</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Products by Status Tabs */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="all">All Products ({filteredProducts.length})</TabsTrigger>
+          <TabsTrigger value="active">Active ({activeProducts.length})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive ({inactiveProducts.length})</TabsTrigger>
+          <TabsTrigger value="discontinued">Discontinued ({discontinuedProducts.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>All Products ({filteredProducts.length})</CardTitle>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Volume</TableHead>
+                      <TableHead>Units/Pallet</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Pallet Value</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((product) => (
+                      <TableRow key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                              <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-gray-500">ID: {product.id}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{product.volume}</Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {product.units_per_pallet.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {product.unit_price.toFixed(2)} DA
+                        </TableCell>
+                        <TableCell className="font-semibold text-green-600">
+                          {(product.unit_price * product.units_per_pallet).toLocaleString()} DA
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(product.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(product.status)}
+                              {product.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(product.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            {canManageProducts && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleEdit(product)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {product.name}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteProduct(product.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="active">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Products ({activeProducts.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeProducts.map((product) => (
+                  <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">{product.name}</CardTitle>
+                        <Badge className={getStatusColor(product.status)}>
+                          <span className="flex items-center gap-1">
+                            {getStatusIcon(product.status)}
+                            {product.status.toUpperCase()}
+                          </span>
+                        </Badge>
+                      </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Volume</p>
+                <p className="font-semibold">{product.volume}</p>
+              </div>
+              <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Units/Pallet</p>
+                          <p className="font-semibold">{product.units_per_pallet}</p>
+                        </div>
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Unit Price</p>
+                        <p className="font-semibold text-lg">{product.unit_price.toFixed(2)} DA</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Pallet Value</p>
+                        <p className="font-semibold text-green-600 text-lg">
+                          {(product.unit_price * product.units_per_pallet).toLocaleString()} DA
+                        </p>
+              </div>
+                      {canManageProducts && (
+              <div className="flex gap-2 pt-4">
+                <Button
+                  size="sm"
+                  variant="outline"
+                            className="flex-1"
+                  onClick={() => handleEdit(product)}
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            className="flex-1"
+                            onClick={() => handleDeleteProduct(product.id)}
+                          >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inactive">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inactive Products ({inactiveProducts.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Volume</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inactiveProducts.map((product) => (
+                      <TableRow key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center">
+                              <Package className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-gray-500">ID: {product.id}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{product.volume}</Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {product.unit_price.toFixed(2)} DA
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(product.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(product.status)}
+                              {product.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(product.updated_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {canManageProducts && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleEdit(product)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {product.name}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteProduct(product.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="discontinued">
+          <Card>
+            <CardHeader>
+              <CardTitle>Discontinued Products ({discontinuedProducts.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Volume</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {discontinuedProducts.map((product) => (
+                      <TableRow key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                              <Package className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-gray-500">ID: {product.id}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{product.volume}</Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {product.unit_price.toFixed(2)} DA
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(product.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(product.status)}
+                              {product.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(product.updated_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {canManageProducts && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleEdit(product)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button size="sm" variant="destructive">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Product</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {product.name}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteProduct(product.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Product {selectedProduct?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && (
+            <form onSubmit={handleUpdateProduct} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_name">Product Name *</Label>
+                  <Input
+                    id="edit_name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_volume">Volume *</Label>
+                  <Input
+                    id="edit_volume"
+                    value={formData.volume}
+                    onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_units_per_pallet">Units Per Pallet *</Label>
+                  <Input
+                    id="edit_units_per_pallet"
+                    type="number"
+                    min="1"
+                    value={formData.units_per_pallet}
+                    onChange={(e) => setFormData({ ...formData, units_per_pallet: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_unit_price">Unit Price (DA) *</Label>
+                  <Input
+                    id="edit_unit_price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.unit_price}
+                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit_status">Status</Label>
+                <select
+                  id="edit_status"
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="discontinued">Discontinued</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Update Product
+                </Button>
+      </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default withAuth(ProductsPage)

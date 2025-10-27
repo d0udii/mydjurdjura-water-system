@@ -4,6 +4,9 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
+import { AuthProvider } from "@/lib/auth"
+import { ThemeProvider } from "@/components/theme-provider"
+import { ConditionalLayout } from "@/components/conditional-layout"
 
 import { Geist_Mono, Poppins as V0_Font_Poppins, Geist_Mono as V0_Font_Geist_Mono, Source_Serif_4 as V0_Font_Source_Serif_4 } from 'next/font/google'
 
@@ -40,8 +43,18 @@ export default function RootLayout({
         />
       </head>
       <body className={`font-sans antialiased`}>
-        <Sidebar />
-        <main className="md:ml-64">{children}</main>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <ConditionalLayout>
+              {children}
+            </ConditionalLayout>
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

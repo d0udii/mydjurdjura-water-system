@@ -72,3 +72,6 @@ export function getSupervisorsByChefRegion(chefRegionId: string): User[] {
 export function getAllSupervisors(): User[] {
   return db.users.filter((u) => u.role === "supervisor")
 }
+
+// Re-export React components from auth.tsx
+export { useAuth, withAuth, AuthProvider } from './auth.tsx'

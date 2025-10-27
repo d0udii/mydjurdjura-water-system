@@ -1,0 +1,1285 @@
+"use client"
+
+import React, { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Plus, Edit2, Trash2, Search, Filter, Download, Upload, CheckCircle, XCircle, Clock, User, Shield, Users, MapPin, Mail, Phone, Eye, MoreHorizontal, UserCheck, UserX, Settings, Crown, Zap, Lock, Unlock } from "lucide-react"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
+import { format } from "date-fns"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'regional_manager' | 'supervisor' | 'operations'
+  region_id?: string
+  status: 'active' | 'inactive' | 'pending'
+  created_at: string
+  updated_at: string
+  regions?: {
+    id: string
+    name: string
+  }
+}
+
+interface Region {
+  id: string
+  name: string
+  description?: string
+}
+
+function UsersPage() {
+  const { user } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  
+  // Admin permissions
+  const isUserAdmin = user?.role === "admin"
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "supervisor" as 'admin' | 'regional_manager' | 'supervisor' | 'operations',
+    region_id: "",
+    status: "active" as 'active' | 'inactive' | 'pending'
+  })
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      
+      // Demo data
+      const demoUsers: User[] = [
+        {
+          id: "USR-001",
+          name: "Admin Djurdjura",
+          email: "admin@djurdjura.dz",
+          role: "admin",
+          status: "active",
+          created_at: "2024-01-01T10:00:00Z",
+          updated_at: "2024-01-01T10:00:00Z"
+        },
+        {
+          id: "USR-002",
+          name: "Hamouch",
+          email: "hamouch@djurdjura.dz",
+          role: "regional_manager",
+          region_id: "REG-001",
+          status: "active",
+          created_at: "2024-01-02T14:30:00Z",
+          updated_at: "2024-01-02T14:30:00Z",
+          regions: {
+            id: "REG-001",
+            name: "East"
+          }
+        },
+        {
+          id: "USR-003",
+          name: "Mahmoud Djouadi",
+          email: "mahmoud@djurdjura.dz",
+          role: "supervisor",
+          region_id: "REG-001",
+          status: "active",
+          created_at: "2024-01-03T08:15:00Z",
+          updated_at: "2024-01-03T08:15:00Z",
+          regions: {
+            id: "REG-001",
+            name: "East"
+          }
+        },
+        {
+          id: "USR-004",
+          name: "Operations Team",
+          email: "operations@djurdjura.dz",
+          role: "operations",
+          region_id: "REG-001",
+          status: "active",
+          created_at: "2024-01-04T11:45:00Z",
+          updated_at: "2024-01-04T11:45:00Z",
+          regions: {
+            id: "REG-001",
+            name: "East"
+          }
+        },
+        {
+          id: "USR-005",
+          name: "New Supervisor",
+          email: "newsupervisor@djurdjura.dz",
+          role: "supervisor",
+          region_id: "REG-002",
+          status: "pending",
+          created_at: "2024-01-05T16:20:00Z",
+          updated_at: "2024-01-05T16:20:00Z",
+          regions: {
+            id: "REG-002",
+            name: "West"
+          }
+        }
+      ]
+
+      const demoRegions: Region[] = [
+        {
+          id: "REG-001",
+          name: "East",
+          description: "Eastern region of Algeria"
+        },
+        {
+          id: "REG-002",
+          name: "West",
+          description: "Western region of Algeria"
+        },
+        {
+          id: "REG-003",
+          name: "Center",
+          description: "Central region of Algeria"
+        }
+      ]
+
+      setUsers(demoUsers)
+      setRegions(demoRegions)
+    } catch (error) {
+      console.error("Failed to fetch data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.name || !formData.email || !formData.password) {
+      alert("Please fill all required fields")
+      return
+    }
+
+    try {
+      const newUser: User = {
+        id: `USR-${String(users.length + 1).padStart(3, '0')}`,
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        region_id: formData.region_id || undefined,
+        status: formData.status,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        regions: formData.region_id ? regions.find(r => r.id === formData.region_id) : undefined
+      }
+
+      setUsers(prev => [newUser, ...prev])
+      setIsCreateOpen(false)
+        resetForm()
+    } catch (error) {
+      console.error("Failed to create user:", error)
+    }
+  }
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedUser) return
+
+    try {
+      const updatedUser = {
+        ...selectedUser,
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        region_id: formData.region_id || undefined,
+        status: formData.status,
+        updated_at: new Date().toISOString(),
+        regions: formData.region_id ? regions.find(r => r.id === formData.region_id) : undefined
+      }
+
+      setUsers(prev => prev.map(user => 
+        user.id === selectedUser.id ? updatedUser : user
+      ))
+      
+      setIsEditOpen(false)
+      setSelectedUser(null)
+      resetForm()
+    } catch (error) {
+      console.error("Failed to update user:", error)
+    }
+  }
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      setUsers(prev => prev.filter(user => user.id !== id))
+    } catch (error) {
+      console.error("Failed to delete user:", error)
+    }
+  }
+
+  const handleApproveUser = async (id: string) => {
+    try {
+      setUsers(prev => prev.map(user => 
+        user.id === id ? { ...user, status: 'active' as const, updated_at: new Date().toISOString() } : user
+      ))
+    } catch (error) {
+      console.error("Failed to approve user:", error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "supervisor",
+      region_id: "",
+      status: "active"
+    })
+  }
+
+  const handleEdit = (user: User) => {
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      region_id: user.region_id || "",
+      status: user.status
+    })
+    setSelectedUser(user)
+    setIsEditOpen(true)
+  }
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "admin":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      case "regional_manager":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      case "supervisor":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "operations":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      default:
+        return "bg-slate-100 text-slate-800"
+    }
+  }
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "admin":
+        return <Shield className="h-4 w-4" />
+      case "regional_manager":
+        return <MapPin className="h-4 w-4" />
+      case "supervisor":
+        return <User className="h-4 w-4" />
+      case "operations":
+        return <Users className="h-4 w-4" />
+      default:
+        return <User className="h-4 w-4" />
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "inactive":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      default:
+        return "bg-slate-100 text-slate-800"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "active":
+        return <CheckCircle className="h-4 w-4" />
+      case "inactive":
+        return <XCircle className="h-4 w-4" />
+      case "pending":
+        return <Clock className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = roleFilter === "all" || user.role === roleFilter
+    const matchesStatus = statusFilter === "all" || user.status === statusFilter
+    
+    return matchesSearch && matchesRole && matchesStatus
+  })
+
+  const admins = filteredUsers.filter(u => u.role === 'admin')
+  const regionalManagers = filteredUsers.filter(u => u.role === 'regional_manager')
+  const supervisors = filteredUsers.filter(u => u.role === 'supervisor')
+  const operations = filteredUsers.filter(u => u.role === 'operations')
+
+  if (user?.role !== "admin") {
+    return (
+      <div className="p-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">Only administrators can manage users</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 md:p-8 space-y-6">
+      {/* Enhanced Header with Admin Controls */}
+      <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-6 border border-red-200 dark:border-red-800">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
+              <Crown className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+        <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Users Management</h1>
+                {isUserAdmin && (
+                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-3 py-1 text-sm font-bold">
+                    <Shield className="h-4 w-4 mr-1" />
+                    ADMIN
+                  </Badge>
+                )}
+        </div>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {isUserAdmin 
+                  ? "Full administrative control over all users, roles, and system permissions"
+                  : "Manage system users, roles, and permissions"
+                }
+              </p>
+              {isUserAdmin && (
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Zap className="h-4 w-4" />
+                    <span className="font-medium">Override Permissions</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-medium">Full System Access</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105" onClick={resetForm}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New User</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                  <Label htmlFor="name">Full Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                  <Label htmlFor="email">Email Address *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                  <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                />
+              </div>
+
+              <div>
+                  <Label htmlFor="role">Role *</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => setFormData({ ...formData, role: value as any })}
+                  >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="regional_manager">Regional Manager</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="operations">Operations</SelectItem>
+                  </SelectContent>
+                </Select>
+                </div>
+              </div>
+
+              {(formData.role === 'regional_manager' || formData.role === 'supervisor' || formData.role === 'operations') && (
+                <div>
+                  <Label htmlFor="region">Region</Label>
+                  <Select
+                    value={formData.region_id}
+                    onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.id} value={region.id}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+                  <div>
+                <Label htmlFor="status">Status</Label>
+                    <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as any })}
+                    >
+                      <SelectTrigger>
+                    <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Add User
+                </Button>
+                  </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{users.length}</div>
+            <p className="text-xs text-slate-500">All users</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{users.filter(u => u.status === 'active').length}</div>
+            <p className="text-xs text-slate-500">Currently active</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Users</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{users.filter(u => u.status === 'pending').length}</div>
+            <p className="text-xs text-slate-500">Awaiting approval</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Roles</CardTitle>
+            <Shield className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">4</div>
+            <p className="text-xs text-slate-500">User roles</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters & Search
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                  placeholder="Search users by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                    />
+                  </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="regional_manager">Regional Manager</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
+                  <SelectItem value="operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+                      </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Users by Role Tabs */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="all">All Users ({filteredUsers.length})</TabsTrigger>
+          <TabsTrigger value="admins">Admins ({admins.length})</TabsTrigger>
+          <TabsTrigger value="managers">Managers ({regionalManagers.length})</TabsTrigger>
+          <TabsTrigger value="supervisors">Supervisors ({supervisors.length})</TabsTrigger>
+          <TabsTrigger value="operations">Operations ({operations.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all">
+      <Card>
+        <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>All Users ({filteredUsers.length})</CardTitle>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-gray-500 flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {user.email}
+                              </div>
+                            </div>
+                        </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getRoleColor(user.role)}>
+                            <span className="flex items-center gap-1">
+                              {getRoleIcon(user.role)}
+                              {user.role.replace("_", " ").toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.regions ? (
+                            <Badge variant="outline">{user.regions.name}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No region</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(user.status)}
+                              {user.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline" title="View User Details">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEdit(user)}
+                              title="Edit User"
+                              className={isUserAdmin ? "border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20" : ""}
+                            >
+                              <Edit2 className="h-4 w-4" />
+              </Button>
+                            
+                            {user.status === 'pending' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleApproveUser(user.id)}
+                                title="Approve User"
+                                className={isUserAdmin ? "border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20" : ""}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
+                            {isUserAdmin && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                title="Admin Override Actions"
+                                className="border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                <Crown className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  title="Delete User"
+                                  className={isUserAdmin ? "bg-red-600 hover:bg-red-700 shadow-lg" : ""}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="flex items-center gap-2">
+                                    {isUserAdmin && <Crown className="h-5 w-5 text-red-600" />}
+                                    Delete User
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {isUserAdmin 
+                                      ? `Admin Override: Are you sure you want to delete ${user.name}? This action cannot be undone and bypasses all restrictions.`
+                                      : `Are you sure you want to delete ${user.name}? This action cannot be undone.`
+                                    }
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="bg-red-600 hover:bg-red-700 shadow-lg"
+                                  >
+                                    {isUserAdmin ? "Admin Delete" : "Delete"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+      </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="admins">
+      <Card>
+        <CardHeader>
+              <CardTitle>Administrators ({admins.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {admins.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(user.status)}
+                              {user.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEdit(user)}
+                            >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                ))}
+                  </TableBody>
+                </Table>
+          </div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="managers">
+      <Card>
+        <CardHeader>
+              <CardTitle>Regional Managers ({regionalManagers.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {regionalManagers.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                        </div>
+                        </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.regions ? (
+                            <Badge variant="outline">{user.regions.name}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No region</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(user.status)}
+                              {user.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                        </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEdit(user)}
+                            >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                            {user.status === 'pending' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleApproveUser(user.id)}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+          </div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="supervisors">
+      <Card>
+        <CardHeader>
+              <CardTitle>Supervisors ({supervisors.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supervisors.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                          </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.regions ? (
+                            <Badge variant="outline">{user.regions.name}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No region</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(user.status)}
+                              {user.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEdit(user)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            {user.status === 'pending' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleApproveUser(user.id)}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="operations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Operations Team ({operations.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Region</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {operations.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>
+                                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.regions ? (
+                            <Badge variant="outline">{user.regions.name}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No region</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(user.status)}
+                              {user.status.toUpperCase()}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                          </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEdit(user)}
+                            >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                            {user.status === 'pending' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleApproveUser(user.id)}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+          </div>
+        </CardContent>
+      </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit User {selectedUser?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedUser && (
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_name">Full Name *</Label>
+                  <Input
+                    id="edit_name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_email">Email Address *</Label>
+                  <Input
+                    id="edit_email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_password">Password</Label>
+                  <Input
+                    id="edit_password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_role">Role *</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => setFormData({ ...formData, role: value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="regional_manager">Regional Manager</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="operations">Operations</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {(formData.role === 'regional_manager' || formData.role === 'supervisor' || formData.role === 'operations') && (
+                <div>
+                  <Label htmlFor="edit_region">Region</Label>
+                  <Select
+                    value={formData.region_id}
+                    onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.id} value={region.id}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="edit_status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Update User
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default withAuth(UsersPage)

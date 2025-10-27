@@ -6,8 +6,8 @@ export interface User {
   name: string
   email: string
   password: string
-  role: "admin" | "chef_region" | "supervisor"
-  region?: string // For chef_region
+  role: "admin" | "regional_manager" | "supervisor" | "operations"
+  region?: string // For regional_manager
   chefRegionId?: string // For supervisor - who they report to
   assignedCities?: string[]
   approved: boolean
@@ -87,13 +87,13 @@ export function initializeDatabase() {
     createdAt: new Date(),
   })
 
-  // Chef de Région - East
+  // Regional Manager - East
   db.users.push({
     id: "2",
     name: "Hamouch",
     email: "hamouch@djurdjura.dz",
     password: "chef123",
-    role: "chef_region",
+    role: "regional_manager",
     region: "East",
     approved: true,
     createdAt: new Date(),
@@ -112,14 +112,25 @@ export function initializeDatabase() {
     createdAt: new Date(),
   })
 
-  // Chef de Région - West
+  // Regional Manager - West
   db.users.push({
     id: "4",
-    name: "Chef Région Ouest",
-    email: "chef.ouest@djurdjura.dz",
+    name: "Sara Regional Manager",
+    email: "sara@djurdjura.dz",
     password: "chef123",
-    role: "chef_region",
+    role: "regional_manager",
     region: "West",
+    approved: true,
+    createdAt: new Date(),
+  })
+
+  // Operations Team
+  db.users.push({
+    id: "5",
+    name: "Operations Team",
+    email: "operations@djurdjura.dz",
+    password: "operations123",
+    role: "operations",
     approved: true,
     createdAt: new Date(),
   })

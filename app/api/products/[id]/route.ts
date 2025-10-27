@@ -1,38 +1,84 @@
-import { getProductById, updateProduct, deleteProduct } from "@/lib/products"
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+interface Product {
+  id: string
+  name: string
+  volume: string
+  units_per_pallet: number
+  unit_price: number
+  status: 'active' | 'inactive' | 'discontinued'
+  created_at: string
+}
+
+// Demo products data
+const demoProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Djurdjura Water 5.5L',
+    volume: '5.5L',
+    units_per_pallet: 212,
+    unit_price: 65,
+    status: 'active',
+    created_at: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: '2',
+    name: 'Djurdjura Water 1.5L',
+    volume: '1.5L',
+    units_per_pallet: 112,
+    unit_price: 178.5,
+    status: 'active',
+    created_at: '2024-01-02T00:00:00Z'
+  }
+]
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const product = getProductById(params.id)
-    if (!product) {
-      return Response.json({ error: "Product not found" }, { status: 404 })
+    const { id } = params
+    const body = await request.json()
+    
+    const productIndex = demoProducts.findIndex(product => product.id === id)
+    if (productIndex === -1) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
-    return Response.json(product)
+
+    // Update the product
+    demoProducts[productIndex] = {
+      ...demoProducts[productIndex],
+      ...body,
+      id: id // Ensure ID doesn't change
+    }
+
+    console.log('Product updated:', demoProducts[productIndex])
+    return NextResponse.json({ product: demoProducts[productIndex] }, { status: 200 })
   } catch (error) {
-    return Response.json({ error: "Failed to fetch product" }, { status: 500 })
+    console.error('Error updating product:', error)
+    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const data = await request.json()
-    const product = updateProduct(params.id, data)
-    if (!product) {
-      return Response.json({ error: "Product not found" }, { status: 404 })
+    const { id } = params
+    
+    const productIndex = demoProducts.findIndex(product => product.id === id)
+    if (productIndex === -1) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
-    return Response.json(product)
-  } catch (error) {
-    return Response.json({ error: "Failed to update product" }, { status: 500 })
-  }
-}
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  try {
-    const success = deleteProduct(params.id)
-    if (!success) {
-      return Response.json({ error: "Product not found" }, { status: 404 })
-    }
-    return Response.json({ success: true })
+    // Remove the product
+    const deletedProduct = demoProducts.splice(productIndex, 1)[0]
+
+    console.log('Product deleted:', deletedProduct)
+    return NextResponse.json({ message: 'Product deleted successfully' }, { status: 200 })
   } catch (error) {
-    return Response.json({ error: "Failed to delete product" }, { status: 500 })
+    console.error('Error deleting product:', error)
+    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
   }
 }

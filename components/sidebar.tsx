@@ -5,10 +5,13 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "./theme-toggle"
+import { NotificationsPanel } from "./notifications-panel"
+import { useAuth } from "@/lib/auth"
 import {
   LayoutDashboard,
   Package,
   Users,
+  UserCog,
   Truck,
   BarChart3,
   Settings,
@@ -16,32 +19,41 @@ import {
   Menu,
   X,
   ShoppingCart,
+  Bell,
+  FileText,
+  Percent,
+  Target,
+  ClipboardList,
+  Zap,
+  Workflow,
+  Package2,
+  Search,
+  Database,
+  Shield,
+  Brain,
+  Smartphone,
 } from "lucide-react"
-
-interface User {
-  id: string
-  name: string
-  role: string
-}
+import { 
+  AnimatedDiv, 
+  FloatingElement, 
+  GradientText, 
+  GlowEffect,
+  RevealOnScroll 
+} from "@/components/animations"
 
 export function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
+  const handleLogout = async () => {
+    await signOut()
     router.push("/")
   }
 
@@ -50,30 +62,151 @@ export function Sidebar() {
       href: "/dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
-      roles: ["admin", "chef_region", "supervisor", "operations"],
+      roles: ["admin", "regional_manager", "supervisor", "operations"],
     },
     {
       href: "/orders",
       label: "Orders",
       icon: ShoppingCart,
-      roles: ["admin", "chef_region", "supervisor", "operations"],
+      roles: ["admin", "regional_manager", "supervisor", "operations"],
     },
-    { href: "/clients", label: "Clients", icon: Users, roles: ["admin", "supervisor"] },
-    { href: "/products", label: "Products", icon: Package, roles: ["admin"] },
-    { href: "/transport", label: "Transport", icon: Truck, roles: ["admin"] },
-    { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
-    { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "chef_region", "operations"] },
+    { 
+      href: "/clients", 
+      label: "Clients", 
+      icon: Users, 
+      roles: ["admin", "supervisor", "regional_manager"] 
+    },
+    { 
+      href: "/products", 
+      label: "Products", 
+      icon: Package, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/transport", 
+      label: "Transport", 
+      icon: Truck, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/users", 
+      label: "Users", 
+      icon: Users, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/supervisors", 
+      label: "Supervisors", 
+      icon: UserCog, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/bl-numbers", 
+      label: "BL Numbers", 
+      icon: FileText, 
+      roles: ["admin", "operations"] 
+    },
+    { 
+      href: "/promotions", 
+      label: "Promotions", 
+      icon: Percent, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/goals", 
+      label: "Goals & Progress", 
+      icon: Target, 
+      roles: ["admin", "regional_manager"] 
+    },
+    { 
+      href: "/pallet-tracking", 
+      label: "Pallet Tracking", 
+      icon: ClipboardList, 
+      roles: ["admin", "operations"] 
+    },
+    { 
+      href: "/notifications", 
+      label: "Notifications", 
+      icon: Bell, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/performance", 
+      label: "Performance", 
+      icon: Zap, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/order-tracking", 
+      label: "Order Tracking", 
+      icon: Package, 
+      roles: ["admin", "operations", "regional_manager"] 
+    },
+    { 
+      href: "/workflows", 
+      label: "Workflows", 
+      icon: Workflow, 
+      roles: ["admin", "regional_manager"] 
+    },
+    { 
+      href: "/inventory", 
+      label: "Inventory", 
+      icon: Package2, 
+      roles: ["admin", "operations"] 
+    },
+    { 
+      href: "/search", 
+      label: "Advanced Search", 
+      icon: Search, 
+      roles: ["admin", "regional_manager", "supervisor"] 
+    },
+    { 
+      href: "/backup", 
+      label: "Backup & Recovery", 
+      icon: Database, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/collaboration", 
+      label: "Real-time Collaboration", 
+      icon: Users, 
+      roles: ["admin", "regional_manager", "supervisor"] 
+    },
+    { 
+      href: "/security", 
+      label: "Security & Audit", 
+      icon: Shield, 
+      roles: ["admin"] 
+    },
+    { 
+      href: "/ai-insights", 
+      label: "AI Insights", 
+      icon: Brain, 
+      roles: ["admin", "regional_manager"] 
+    },
+    { 
+      href: "/mobile", 
+      label: "Mobile Integration", 
+      icon: Smartphone, 
+      roles: ["admin", "operations"] 
+    },
+    { 
+      href: "/reports", 
+      label: "Reports", 
+      icon: BarChart3, 
+      roles: ["admin", "regional_manager", "supervisor"] 
+    },
     {
       href: "/settings",
       label: "Settings",
       icon: Settings,
-      roles: ["admin", "chef_region", "supervisor", "operations"],
+      roles: ["admin", "regional_manager", "supervisor", "operations"],
     },
   ]
 
   const visibleItems = menuItems.filter((item) => user && item.roles.includes(user.role))
 
-  if (!mounted) return null
+  if (!mounted || !user) return null
 
   return (
     <>
@@ -91,45 +224,65 @@ export function Sidebar() {
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold">Djurdjura</h1>
-            <p className="text-sm text-slate-400">Water Distribution</p>
-          </div>
+          <RevealOnScroll direction="down" delay={0.1}>
+            <div className="mb-8">
+              <div className="flex items-center space-x-3">
+                <FloatingElement intensity="medium">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                </FloatingElement>
+                <div>
+                  <GradientText gradient="blue-purple" className="text-2xl font-bold">
+                    Djurdjura
+                  </GradientText>
+                  <p className="text-sm text-slate-400">Water Distribution</p>
+                </div>
+              </div>
+            </div>
+          </RevealOnScroll>
 
           <nav className="flex-1 space-y-2">
-            {visibleItems.map((item) => {
+            {visibleItems.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "default" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {item.label}
-                  </Button>
-                </Link>
+                <RevealOnScroll key={item.href} direction="left" delay={0.1 * index}>
+                  <Link href={item.href}>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      className="w-full justify-start hover:bg-slate-800 transition-all duration-200 transform hover:scale-105"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                </RevealOnScroll>
               )
             })}
           </nav>
 
-          <div className="space-y-4 border-t border-slate-700 pt-4">
-            <div className="text-sm">
-              <p className="text-slate-400">Logged in as:</p>
-              <p className="font-semibold">{user?.name}</p>
-              <p className="text-xs text-slate-400">{user?.role.replace("_", " ").toUpperCase()}</p>
-            </div>
+          <RevealOnScroll direction="up" delay={0.5}>
+            <div className="space-y-4 border-t border-slate-700 pt-4">
+              <div className="text-sm">
+                <p className="text-slate-400">Logged in as:</p>
+                <p className="font-semibold">{user.name}</p>
+                <p className="text-xs text-slate-400">
+                  {user.role.replace("_", " ").toUpperCase()}
+                </p>
+              </div>
 
-            <div className="flex items-center justify-between">
-              <ThemeToggle />
-              <Button variant="destructive" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+              <div className="flex items-center justify-between">
+                <ThemeToggle />
+                <NotificationsPanel />
+                <Button variant="destructive" size="sm" onClick={handleLogout} className="hover:bg-red-600 transition-all duration-200 transform hover:scale-105">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
             </div>
-          </div>
+          </RevealOnScroll>
         </div>
       </aside>
 

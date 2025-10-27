@@ -1,0 +1,202 @@
+import { NextRequest, NextResponse } from 'next/server'
+
+// Mock pallet tracking storage (in production, this would be in Supabase)
+let palletTracking: any[] = [
+  {
+    id: "PALLET-001",
+    order_id: "ORD-001",
+    client_id: "CLI-001",
+    wooden_pallets_sent: 22,
+    intercalaires_sent: 88,
+    wooden_pallets_returned: 20,
+    intercalaires_returned: 80,
+    wooden_pallets_good_condition: 18,
+    wooden_pallets_bad_condition: 2,
+    intercalaires_good_condition: 75,
+    intercalaires_bad_condition: 5,
+    return_date: "2024-01-15",
+    notes: "Client returned most pallets in good condition",
+    status: "partial_return",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-15T00:00:00Z"
+  }
+]
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const orderId = searchParams.get('order_id')
+    const clientId = searchParams.get('client_id')
+    const status = searchParams.get('status')
+    
+    let filteredTracking = palletTracking
+    
+    if (orderId) {
+      filteredTracking = filteredTracking.filter(p => p.order_id === orderId)
+    }
+    
+    if (clientId) {
+      filteredTracking = filteredTracking.filter(p => p.client_id === clientId)
+    }
+    
+    if (status) {
+      filteredTracking = filteredTracking.filter(p => p.status === status)
+    }
+    
+    return NextResponse.json({ palletTracking: filteredTracking })
+  } catch (error) {
+    console.error('Error fetching pallet tracking:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const {
+      order_id,
+      client_id,
+      wooden_pallets_sent,
+      intercalaires_sent,
+      wooden_pallets_returned,
+      intercalaires_returned,
+      wooden_pallets_good_condition,
+      wooden_pallets_bad_condition,
+      intercalaires_good_condition,
+      intercalaires_bad_condition,
+      return_date,
+      notes
+    } = data
+    
+    // Validation
+    if (!order_id || !client_id || !wooden_pallets_sent || !intercalaires_sent) {
+      return NextResponse.json(
+        { error: 'Order ID, Client ID, and pallet quantities are required' },
+        { status: 400 }
+      )
+    }
+    
+    // Calculate status based on returns
+    let status = "no_return"
+    if (wooden_pallets_returned > 0 || intercalaires_returned > 0) {
+      const totalPalletsSent = wooden_pallets_sent + intercalaires_sent
+      const totalReturned = wooden_pallets_returned + intercalaires_returned
+      
+      if (totalReturned === totalPalletsSent) {
+        status = "full_return"
+      } else {
+        status = "partial_return"
+      }
+    }
+    
+    const newTracking = {
+      id: `PALLET-${String(Date.now()).slice(-6)}`,
+      order_id,
+      client_id,
+      wooden_pallets_sent: parseInt(wooden_pallets_sent),
+      intercalaires_sent: parseInt(intercalaires_sent),
+      wooden_pallets_returned: parseInt(wooden_pallets_returned) || 0,
+      intercalaires_returned: parseInt(intercalaires_returned) || 0,
+      wooden_pallets_good_condition: parseInt(wooden_pallets_good_condition) || 0,
+      wooden_pallets_bad_condition: parseInt(wooden_pallets_bad_condition) || 0,
+      intercalaires_good_condition: parseInt(intercalaires_good_condition) || 0,
+      intercalaires_bad_condition: parseInt(intercalaires_bad_condition) || 0,
+      return_date: return_date || null,
+      notes: notes || "",
+      status,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    
+    palletTracking.push(newTracking)
+    
+    return NextResponse.json({ 
+      palletTracking: newTracking, 
+      message: "Pallet tracking created successfully" 
+    }, { status: 201 })
+  } catch (error) {
+    console.error('Error creating pallet tracking:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const data = await request.json()
+    const { id, ...updateData } = data
+    
+    const trackingIndex = palletTracking.findIndex(p => p.id === id)
+    if (trackingIndex === -1) {
+      return NextResponse.json(
+        { error: 'Pallet tracking record not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Recalculate status if return data is updated
+    if (updateData.wooden_pallets_returned !== undefined || updateData.intercalaires_returned !== undefined) {
+      const current = palletTracking[trackingIndex]
+      const woodenReturned = updateData.wooden_pallets_returned !== undefined ? updateData.wooden_pallets_returned : current.wooden_pallets_returned
+      const intercalairesReturned = updateData.intercalaires_returned !== undefined ? updateData.intercalaires_returned : current.intercalaires_returned
+      
+      let status = "no_return"
+      if (woodenReturned > 0 || intercalairesReturned > 0) {
+        const totalPalletsSent = current.wooden_pallets_sent + current.intercalaires_sent
+        const totalReturned = woodenReturned + intercalairesReturned
+        
+        if (totalReturned === totalPalletsSent) {
+          status = "full_return"
+        } else {
+          status = "partial_return"
+        }
+      }
+      
+      updateData.status = status
+    }
+    
+    palletTracking[trackingIndex] = {
+      ...palletTracking[trackingIndex],
+      ...updateData,
+      updated_at: new Date().toISOString()
+    }
+    
+    return NextResponse.json({ 
+      palletTracking: palletTracking[trackingIndex], 
+      message: "Pallet tracking updated successfully" 
+    })
+  } catch (error) {
+    console.error('Error updating pallet tracking:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Pallet tracking ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    const trackingIndex = palletTracking.findIndex(p => p.id === id)
+    if (trackingIndex === -1) {
+      return NextResponse.json(
+        { error: 'Pallet tracking record not found' },
+        { status: 404 }
+      )
+    }
+    
+    palletTracking.splice(trackingIndex, 1)
+    
+    return NextResponse.json({ 
+      message: "Pallet tracking record deleted successfully" 
+    })
+  } catch (error) {
+    console.error('Error deleting pallet tracking:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

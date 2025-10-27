@@ -1,144 +1,178 @@
 "use client"
 
-import type React from "react"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import React, { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Plus, Edit2, Trash2, CheckCircle, XCircle } from "lucide-react"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Crown, Shield, Zap, Lock, Edit, Trash2, UserPlus, CheckCircle, XCircle } from "lucide-react"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
+import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
+import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
 
 interface User {
   id: string
   name: string
   email: string
-  role: string
-  region?: string
-  chefRegionId?: string
-  assignedCities?: string[]
-  approved: boolean
+  role: 'admin' | 'regional_manager' | 'supervisor' | 'operations'
+  status: 'active' | 'inactive' | 'pending'
+  created_at: string
 }
 
-export default function UsersPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+function UsersPage() {
+  const { user } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "supervisor",
-    region: "",
-    chefRegionId: "",
-    assignedCities: "",
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    role: 'supervisor' as 'admin' | 'regional_manager' | 'supervisor' | 'operations',
+    status: 'active' as 'active' | 'inactive' | 'pending'
   })
+  
+  // Admin permissions
+  const isUserAdmin = user?.role === "admin"
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
+    fetchData()
+  }, [])
 
-    if (!token) {
-      router.push("/")
-      return
-    }
-
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
-
-    fetchUsers()
-  }, [router])
-
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch("/api/users")
-      const data = await response.json()
-      setUsers(data)
+      const response = await fetch('/api/users')
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users || [])
+      }
     } catch (error) {
-      console.error("Failed to fetch users:", error)
+      console.error('Error fetching users:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEditUser = (userToEdit: User) => {
+    setSelectedUser(userToEdit)
+    setEditForm({
+      name: userToEdit.name,
+      email: userToEdit.email,
+      role: userToEdit.role,
+      status: userToEdit.status
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateUser = async () => {
+    if (!selectedUser) return
+
+    // Validation
+    if (!editForm.name.trim()) {
+      showEditErrorToast('User', 'Name is required')
+      return
+    }
+    if (!editForm.email.trim()) {
+      showEditErrorToast('User', 'Email is required')
+      return
+    }
 
     try {
-      const endpoint = editingId ? `/api/users/${editingId}` : "/api/users"
-      const method = editingId ? "PUT" : "POST"
+      const oldValues = {
+        name: selectedUser.name,
+        email: selectedUser.email,
+        role: selectedUser.role,
+        status: selectedUser.status
+      }
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          assignedCities: formData.assignedCities.split(",").map((c) => c.trim()),
-        }),
+      const response = await fetch(`/api/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editForm),
       })
 
       if (response.ok) {
-        fetchUsers()
-        setIsOpen(false)
-        resetForm()
+        // Update local state
+        setUsers(users.map(u => 
+          u.id === selectedUser.id 
+            ? { ...u, ...editForm }
+            : u
+        ))
+        
+        showEditSuccessToast('User', editForm.name)
+        
+        // Log activity
+        await logEditActivity(
+          user?.id || 'unknown',
+          user?.name || 'Unknown User',
+          'User',
+          selectedUser.id,
+          editForm.name,
+          oldValues,
+          editForm
+        )
+        
+        setIsEditDialogOpen(false)
+        setSelectedUser(null)
+      } else {
+        const errorData = await response.json()
+        showEditErrorToast('User', errorData.error || 'Failed to update user')
       }
     } catch (error) {
-      console.error("Failed to save user:", error)
+      console.error('Error updating user:', error)
+      showEditErrorToast('User', 'Network error occurred')
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return
+  const handleDeleteUser = async (userId: string) => {
+    const userToDelete = users.find(u => u.id === userId)
+    if (!userToDelete) {
+      showEditErrorToast('User', 'User not found')
+      return
+    }
 
     try {
-      await fetch(`/api/users/${id}`, { method: "DELETE" })
-      fetchUsers()
+      const oldValues = {
+        name: userToDelete.name,
+        email: userToDelete.email,
+        role: userToDelete.role,
+        status: userToDelete.status
+      }
+
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Update local state
+        setUsers(users.filter(u => u.id !== userId))
+        
+        showDeleteSuccessToast('User', userToDelete.name)
+        
+        // Log activity
+        await logDeleteActivity(
+          user?.id || 'unknown',
+          user?.name || 'Unknown User',
+          'User',
+          userId,
+          userToDelete.name,
+          oldValues
+        )
+      } else {
+        const errorData = await response.json()
+        showEditErrorToast('User', errorData.error || 'Failed to delete user')
+      }
     } catch (error) {
-      console.error("Failed to delete user:", error)
+      console.error('Error deleting user:', error)
+      showEditErrorToast('User', 'Network error occurred')
     }
-  }
-
-  const handleApprove = async (id: string) => {
-    try {
-      await fetch(`/api/users/${id}/approve`, { method: "POST" })
-      fetchUsers()
-    } catch (error) {
-      console.error("Failed to approve user:", error)
-    }
-  }
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      role: "supervisor",
-      region: "",
-      chefRegionId: "",
-      assignedCities: "",
-    })
-    setEditingId(null)
-  }
-
-  const handleEdit = (u: User) => {
-    setFormData({
-      name: u.name,
-      email: u.email,
-      password: "",
-      role: u.role,
-      region: u.region || "",
-      chefRegionId: u.chefRegionId || "",
-      assignedCities: u.assignedCities?.join(", ") || "",
-    })
-    setEditingId(u.id)
-    setIsOpen(true)
   }
 
   if (user?.role !== "admin") {
@@ -152,296 +186,224 @@ export default function UsersPage() {
     )
   }
 
-  if (loading) return <div className="p-8">Loading...</div>
-
-  const chefRegions = users.filter((u) => u.role === "chef_region")
-  const supervisors = users.filter((u) => u.role === "supervisor")
-  const admins = users.filter((u) => u.role === "admin")
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-slate-600 dark:text-slate-400">Manage system users and permissions</p>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Edit User" : "Create New User"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+      {/* Enhanced Header with Admin Controls */}
+      <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-6 border border-red-200 dark:border-red-800">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
+              <Crown className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Users Management</h1>
+                {isUserAdmin && (
+                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-3 py-1 text-sm font-bold">
+                    <Shield className="h-4 w-4 mr-1" />
+                    ADMIN
+                  </Badge>
+                )}
               </div>
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingId ? "Leave blank to keep current" : ""}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="chef_region">Chef de Région</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.role === "chef_region" && (
-                <div>
-                  <Label htmlFor="region">Region</Label>
-                  <Select
-                    value={formData.region}
-                    onValueChange={(value) => setFormData({ ...formData, region: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="East">East</SelectItem>
-                      <SelectItem value="West">West</SelectItem>
-                      <SelectItem value="North">North</SelectItem>
-                      <SelectItem value="South">South</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {isUserAdmin 
+                  ? "Full administrative control over all users, roles, and system permissions"
+                  : "Manage system users, roles, and permissions"
+                }
+              </p>
+              {isUserAdmin && (
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Zap className="h-4 w-4" />
+                    <span className="font-medium">Override Permissions</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-medium">Full System Access</span>
+                  </div>
                 </div>
               )}
-
-              {formData.role === "supervisor" && (
-                <>
-                  <div>
-                    <Label htmlFor="chefRegion">Chef de Région</Label>
-                    <Select
-                      value={formData.chefRegionId}
-                      onValueChange={(value) => setFormData({ ...formData, chefRegionId: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select chef de région" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {chefRegions.map((chef) => (
-                          <SelectItem key={chef.id} value={chef.id}>
-                            {chef.name} ({chef.region})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="cities">Assigned Cities (comma-separated)</Label>
-                    <Input
-                      id="cities"
-                      value={formData.assignedCities}
-                      onChange={(e) => setFormData({ ...formData, assignedCities: e.target.value })}
-                      placeholder="Biskra, Ouled Djellal, Tebessa"
-                    />
-                  </div>
-                </>
-              )}
-
-              <Button type="submit" className="w-full">
-                {editingId ? "Update User" : "Create User"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+              Add User
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Admins Section */}
+      {/* Users List */}
       <Card>
         <CardHeader>
-          <CardTitle>Administrators</CardTitle>
+          <CardTitle>All Users ({users.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-4">Name</th>
-                  <th className="text-left py-2 px-4">Email</th>
-                  <th className="text-left py-2 px-4">Status</th>
-                  <th className="text-left py-2 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admins.map((u) => (
-                  <tr key={u.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800">
-                    <td className="py-2 px-4">{u.name}</td>
-                    <td className="py-2 px-4">{u.email}</td>
-                    <td className="py-2 px-4">
-                      <div className="flex items-center text-green-600">
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Approved
-                      </div>
-                    </td>
-                    <td className="py-2 px-4 space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(u)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {users.map((userItem) => (
+              <div key={userItem.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-lg">{userItem.name}</h3>
+                    {userItem.role === 'admin' && (
+                      <Crown className="h-5 w-5 text-red-500" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{userItem.email}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                    Created: {new Date(userItem.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Badge className={userItem.role === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}>
+                      {userItem.role.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                    <Badge className={userItem.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : userItem.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'}>
+                      {userItem.status === 'active' && <CheckCircle className="h-3 w-3 mr-1" />}
+                      {userItem.status === 'inactive' && <XCircle className="h-3 w-3 mr-1" />}
+                      {userItem.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditUser(userItem)}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 hover:border-blue-300"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200 hover:border-red-300"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2">
+                            <Trash2 className="h-5 w-5 text-red-500" />
+                            Delete User
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete <strong>{userItem.name}</strong>? 
+                            This action cannot be undone.
+                            {isUserAdmin && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm font-medium">
+                                  <Crown className="h-4 w-4" />
+                                  Admin Override Permission
+                                </div>
+                              </div>
+                            )}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteUser(userItem.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete User
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Chef de Région Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Chef de Région</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-4">Name</th>
-                  <th className="text-left py-2 px-4">Email</th>
-                  <th className="text-left py-2 px-4">Region</th>
-                  <th className="text-left py-2 px-4">Status</th>
-                  <th className="text-left py-2 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chefRegions.map((u) => (
-                  <tr key={u.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800">
-                    <td className="py-2 px-4">{u.name}</td>
-                    <td className="py-2 px-4">{u.email}</td>
-                    <td className="py-2 px-4">{u.region}</td>
-                    <td className="py-2 px-4">
-                      {u.approved ? (
-                        <div className="flex items-center text-green-600">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Approved
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-yellow-600">
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Pending
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2 px-4 space-x-2">
-                      {!u.approved && (
-                        <Button size="sm" variant="outline" onClick={() => handleApprove(u.id)}>
-                          Approve
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(u)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(u.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-500" />
+              Edit User
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Enter user name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="Enter user email"
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Role</Label>
+              <Select value={editForm.role} onValueChange={(value: 'admin' | 'regional_manager' | 'supervisor' | 'operations') => setEditForm({ ...editForm, role: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="regional_manager">Regional Manager</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
+                  <SelectItem value="operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select value={editForm.status} onValueChange={(value: 'active' | 'inactive' | 'pending') => setEditForm({ ...editForm, status: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateUser} className="bg-blue-600 hover:bg-blue-700">
+                Update User
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Supervisors Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Supervisors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-4">Name</th>
-                  <th className="text-left py-2 px-4">Email</th>
-                  <th className="text-left py-2 px-4">Chef de Région</th>
-                  <th className="text-left py-2 px-4">Cities</th>
-                  <th className="text-left py-2 px-4">Status</th>
-                  <th className="text-left py-2 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {supervisors.map((u) => {
-                  const chef = chefRegions.find((c) => c.id === u.chefRegionId)
-                  return (
-                    <tr key={u.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <td className="py-2 px-4">{u.name}</td>
-                      <td className="py-2 px-4">{u.email}</td>
-                      <td className="py-2 px-4">{chef?.name || "Unassigned"}</td>
-                      <td className="py-2 px-4 text-xs">{u.assignedCities?.join(", ")}</td>
-                      <td className="py-2 px-4">
-                        {u.approved ? (
-                          <div className="flex items-center text-green-600">
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approved
-                          </div>
-                        ) : (
-                          <div className="flex items-center text-yellow-600">
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Pending
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-2 px-4 space-x-2">
-                        {!u.approved && (
-                          <Button size="sm" variant="outline" onClick={() => handleApprove(u.id)}>
-                            Approve
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" onClick={() => handleEdit(u)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDelete(u.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
+export default withAuth(UsersPage)

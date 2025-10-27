@@ -1,0 +1,828 @@
+"use client"
+
+import React, { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Progress } from "@/components/ui/progress"
+import { Plus, Edit, Trash2, MoreHorizontal, Download, Search, Filter, RefreshCw, Target, TrendingUp, Users, MapPin, User, Calendar, BarChart3, CheckCircle, Clock, AlertCircle } from "lucide-react"
+
+// Mock auth hook for demo
+const useAuth = () => ({
+  user: { id: "demo-admin", role: "admin", name: "Admin" }
+})
+
+const withAuth = (Component: any) => Component
+
+interface Goal {
+  id: string
+  title: string
+  description: string
+  target_type: "supervisor" | "client" | "city"
+  target_id: string
+  metric_type: "orders_count" | "revenue" | "clients_count"
+  target_value: number
+  current_value: number
+  start_date: string
+  end_date: string
+  status: "active" | "completed" | "failed" | "paused"
+  priority: "low" | "medium" | "high"
+  created_by: string
+  created_at: string
+  progress_percentage: number
+}
+
+function GoalsPage() {
+  const { user } = useAuth()
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState("all")
+  const [filterType, setFilterType] = useState("all")
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    target_type: "supervisor" as "supervisor" | "client" | "city",
+    target_id: "",
+    metric_type: "orders_count" as "orders_count" | "revenue" | "clients_count",
+    target_value: "",
+    start_date: "",
+    end_date: "",
+    priority: "medium" as "low" | "medium" | "high"
+  })
+
+  // Demo data
+  const demoGoals: Goal[] = [
+    {
+      id: "GOAL-001",
+      title: "Monthly Sales Target",
+      description: "Achieve 100 orders this month",
+      target_type: "supervisor",
+      target_id: "USR-003", // Mahmoud's ID
+      metric_type: "orders_count",
+      target_value: 100,
+      current_value: 45,
+      start_date: "2024-01-01",
+      end_date: "2024-01-31",
+      status: "active",
+      priority: "high",
+      created_by: "USR-001",
+      created_at: "2024-01-01T00:00:00Z",
+      progress_percentage: 45
+    },
+    {
+      id: "GOAL-002",
+      title: "Client Acquisition Goal",
+      description: "Add 10 new clients in Biskra region",
+      target_type: "city",
+      target_id: "Biskra",
+      metric_type: "clients_count",
+      target_value: 10,
+      current_value: 7,
+      start_date: "2024-01-01",
+      end_date: "2024-03-31",
+      status: "active",
+      priority: "medium",
+      created_by: "USR-001",
+      created_at: "2024-01-01T00:00:00Z",
+      progress_percentage: 70
+    },
+    {
+      id: "GOAL-003",
+      title: "Revenue Target",
+      description: "Achieve 2M DA revenue this quarter",
+      target_type: "supervisor",
+      target_id: "USR-003",
+      metric_type: "revenue",
+      target_value: 2000000,
+      current_value: 1200000,
+      start_date: "2024-01-01",
+      end_date: "2024-03-31",
+      status: "active",
+      priority: "high",
+      created_by: "USR-001",
+      created_at: "2024-01-01T00:00:00Z",
+      progress_percentage: 60
+    }
+  ]
+
+  useEffect(() => {
+    // Simulate API call
+    setTimeout(() => {
+      setGoals(demoGoals)
+      setLoading(false)
+    }, 1000)
+  }, [])
+
+  const handleCreateGoal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.title || !formData.target_value || !formData.target_id || !formData.start_date || !formData.end_date) {
+      alert("Please fill all required fields")
+      return
+    }
+
+    try {
+      const response = await fetch('/api/goals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          target_value: parseFloat(formData.target_value),
+          created_by: user.id
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setGoals(prev => [data.goal, ...prev])
+        setIsCreateOpen(false)
+        resetForm()
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to create goal')
+      }
+    } catch (error) {
+      console.error("Failed to create goal:", error)
+      alert('Failed to create goal')
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      description: "",
+      target_type: "supervisor",
+      target_id: "",
+      metric_type: "orders_count",
+      target_value: "",
+      start_date: "",
+      end_date: "",
+      priority: "medium"
+    })
+  }
+
+  const handleEdit = (goal: Goal) => {
+    setSelectedGoal(goal)
+    setFormData({
+      title: goal.title,
+      description: goal.description,
+      target_type: goal.target_type,
+      target_id: goal.target_id,
+      metric_type: goal.metric_type,
+      target_value: goal.target_value.toString(),
+      start_date: goal.start_date,
+      end_date: goal.end_date,
+      priority: goal.priority
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdateGoal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedGoal) {
+      alert("No goal selected for update")
+      return
+    }
+
+    try {
+      const response = await fetch('/api/goals', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedGoal.id,
+          title: formData.title,
+          description: formData.description,
+          target_type: formData.target_type,
+          target_id: formData.target_id,
+          metric_type: formData.metric_type,
+          target_value: parseFloat(formData.target_value),
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          priority: formData.priority
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setGoals(prev => prev.map(goal => 
+          goal.id === selectedGoal.id ? data.goal : goal
+        ))
+        setIsEditOpen(false)
+        setSelectedGoal(null)
+        resetForm()
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update goal')
+      }
+    } catch (error) {
+      console.error("Failed to update goal:", error)
+      alert('Failed to update goal')
+    }
+  }
+
+  const handleDelete = async (goalId: string) => {
+    try {
+      const response = await fetch(`/api/goals?id=${goalId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setGoals(prev => prev.filter(goal => goal.id !== goalId))
+        alert("Goal deleted successfully!")
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to delete goal')
+      }
+    } catch (error) {
+      console.error("Failed to delete goal:", error)
+      alert('Failed to delete goal')
+    }
+  }
+
+  const handleUpdateProgress = async (goalId: string, newValue: number) => {
+    try {
+      const response = await fetch('/api/goals', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: goalId,
+          current_value: newValue
+        })
+      })
+
+      if (response.ok) {
+        setGoals(prev => prev.map(goal => 
+          goal.id === goalId ? { 
+            ...goal, 
+            current_value: newValue,
+            progress_percentage: Math.round((newValue / goal.target_value) * 100),
+            status: newValue >= goal.target_value ? "completed" : goal.status
+          } : goal
+        ))
+        alert("Progress updated successfully!")
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update progress')
+      }
+    } catch (error) {
+      console.error("Failed to update progress:", error)
+      alert('Failed to update progress')
+    }
+  }
+
+  const filteredGoals = goals.filter(goal => {
+    const matchesSearch = goal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         goal.target_id.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = filterStatus === "all" || goal.status === filterStatus
+    const matchesType = filterType === "all" || goal.target_type === filterType
+    return matchesSearch && matchesStatus && matchesType
+  })
+
+  const canManageGoals = user?.role === "admin" || user?.role === "regional_manager"
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed": return <CheckCircle className="h-4 w-4 text-green-600" />
+      case "active": return <Clock className="h-4 w-4 text-blue-600" />
+      case "failed": return <AlertCircle className="h-4 w-4 text-red-600" />
+      case "paused": return <Clock className="h-4 w-4 text-yellow-600" />
+      default: return <Clock className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "active": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      case "failed": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      case "paused": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+      case "medium": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      case "low": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="p-4 md:p-6 lg:p-8 space-y-6">
+        {/* Enhanced Header */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg">
+                  <Target className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  Goals & Progress Tracking
+                </h1>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
+                Set and track goals for supervisors, clients, and cities with real-time progress monitoring
+              </p>
+            </div>
+            
+            {canManageGoals && (
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="lg"
+                    className="w-full lg:w-auto bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    onClick={resetForm}
+                  >
+                    <Plus className="mr-2 h-5 w-5" />
+                    Create Goal
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                        <Target className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      Create New Goal
+                    </DialogTitle>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                      Set measurable goals for supervisors, clients, or cities with specific metrics and deadlines.
+                    </p>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateGoal} className="space-y-6 pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="title" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Goal Title <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="title"
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          placeholder="e.g., Monthly Sales Target"
+                          className="h-12"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="target_type" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Target Type <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={formData.target_type}
+                          onValueChange={(value: "supervisor" | "client" | "city") => setFormData({ ...formData, target_type: value })}
+                        >
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select target type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="supervisor">
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Supervisor
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="client">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Client
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="city">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4" />
+                                City
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="description" className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Describe the goal details..."
+                        className="min-h-[100px]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="target_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Target ID <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="target_id"
+                          value={formData.target_id}
+                          onChange={(e) => setFormData({ ...formData, target_id: e.target.value })}
+                          placeholder={
+                            formData.target_type === "supervisor" ? "USR-003" :
+                            formData.target_type === "client" ? "CLI-001" :
+                            "Biskra"
+                          }
+                          className="h-12"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formData.target_type === "supervisor" ? "Enter supervisor user ID" :
+                           formData.target_type === "client" ? "Enter client ID" :
+                           "Enter city name"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="metric_type" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Metric Type <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={formData.metric_type}
+                          onValueChange={(value: "orders_count" | "revenue" | "clients_count") => setFormData({ ...formData, metric_type: value })}
+                        >
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select metric type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="orders_count">
+                              <div className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" />
+                                Orders Count
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="revenue">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4" />
+                                Revenue
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="clients_count">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Clients Count
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="target_value" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Target Value <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="target_value"
+                          type="number"
+                          value={formData.target_value}
+                          onChange={(e) => setFormData({ ...formData, target_value: e.target.value })}
+                          placeholder="100"
+                          className="h-12"
+                          min="0"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formData.metric_type === "revenue" ? "Enter amount in DA" : "Enter count"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="start_date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Start Date <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="start_date"
+                          type="date"
+                          value={formData.start_date}
+                          onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                          className="h-12"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="end_date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          End Date <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="end_date"
+                          type="date"
+                          value={formData.end_date}
+                          onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                          className="h-12"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="priority" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Priority
+                      </Label>
+                      <Select
+                        value={formData.priority}
+                        onValueChange={(value: "low" | "medium" | "high") => setFormData({ ...formData, priority: value })}
+                      >
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low Priority</SelectItem>
+                          <SelectItem value="medium">Medium Priority</SelectItem>
+                          <SelectItem value="high">High Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreateOpen(false)}
+                        className="px-6"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="px-8 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        Create Goal
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search goals..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-12"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="paused">Paused</option>
+              </select>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              >
+                <option value="all">All Types</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="client">Client</option>
+                <option value="city">City</option>
+              </select>
+              <Button variant="outline" size="sm" className="h-12 px-4">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Goals Table */}
+        <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-t-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold">Goals ({filteredGoals.length})</CardTitle>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Track progress and performance goals</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" className="hover:bg-green-50 dark:hover:bg-green-900/20">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 dark:bg-gray-700">
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Goal</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Target</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Progress</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Priority</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Duration</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Created</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredGoals.map((goal) => (
+                    <TableRow key={goal.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium text-gray-900 dark:text-white">{goal.title}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 max-w-[200px] truncate">
+                            {goal.description}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {goal.target_type === "supervisor" && <User className="h-3 w-3 inline mr-1" />}
+                            {goal.target_type === "client" && <Users className="h-3 w-3 inline mr-1" />}
+                            {goal.target_type === "city" && <MapPin className="h-3 w-3 inline mr-1" />}
+                            {goal.target_type.charAt(0).toUpperCase() + goal.target_type.slice(1)}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{goal.target_id}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {goal.metric_type === "revenue" ? `${goal.target_value.toLocaleString()} DA` : goal.target_value}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {goal.current_value} / {goal.target_value}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {goal.progress_percentage}%
+                            </span>
+                          </div>
+                          <Progress value={goal.progress_percentage} className="h-2" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="secondary"
+                          className={getStatusColor(goal.status)}
+                        >
+                          <div className="flex items-center gap-1">
+                            {getStatusIcon(goal.status)}
+                            {goal.status.toUpperCase()}
+                          </div>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="secondary"
+                          className={getPriorityColor(goal.priority)}
+                        >
+                          {goal.priority.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {new Date(goal.start_date).toLocaleDateString()}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(goal.end_date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-500">
+                          {new Date(goal.created_at).toLocaleDateString()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {canManageGoals && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(goal)}
+                                className="hover:bg-green-50 dark:hover:bg-green-900/20"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Goal</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this goal? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(goal.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                const newValue = prompt(`Enter new progress value for ${goal.title}:`, goal.current_value.toString())
+                                if (newValue && !isNaN(Number(newValue))) {
+                                  handleUpdateProgress(goal.id, Number(newValue))
+                                }
+                              }}>
+                                <TrendingUp className="mr-2 h-4 w-4" />
+                                Update Progress
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <BarChart3 className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Download className="mr-2 h-4 w-4" />
+                                Export
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+export default withAuth(GoalsPage)
