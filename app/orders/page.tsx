@@ -1066,6 +1066,87 @@ const OrdersPage = () => {
     alert(`Order Details:\nID: ${order.id}\nClient: ${order.clients?.name}\nStatus: ${order.status}\nTotal: ${order.total_price.toLocaleString()} DA`)
   }
 
+  const handleEditOrder = (order: Order) => {
+    setCurrentOrder(order)
+    setFormData({
+      client_id: order.client_id,
+      region_id: order.region_id,
+      product_5_5L_pallets: order.product_5_5L_pallets,
+      product_1_5L_pallets: order.product_1_5L_pallets,
+      truck_type: order.truck_type,
+      notes: order.notes || "",
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!currentOrder) return
+
+    try {
+      const totalPallets = formData.product_5_5L_pallets + formData.product_1_5L_pallets
+      const truckCapacity = totalPallets <= 22 ? 22 : totalPallets <= 24 ? 24 : 26
+      
+      // Calculate pricing
+      const product5_5LPrice = formData.product_5_5L_pallets * 212 * 65
+      const product1_5LPrice = formData.product_1_5L_pallets * 112 * 178.5
+      const productTotal = product5_5LPrice + product1_5LPrice
+      
+      // Transport cost
+      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(formData.region_id) : 0
+      const totalPrice = productTotal + transportCost
+
+      const updateData = {
+        action: 'edit',
+        assigned_to: currentOrder.assigned_to,
+        delivery_date: currentOrder.delivery_date,
+        total_price: totalPrice,
+        product_5_5L_pallets: formData.product_5_5L_pallets,
+        product_1_5L_pallets: formData.product_1_5L_pallets,
+        truck_type: formData.truck_type,
+        truck_capacity: truckCapacity,
+        notes: formData.notes,
+        user_role: user?.role,
+        user_id: user?.id
+      }
+
+      const response = await ordersApi.update(currentOrder.id, updateData)
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update order')
+      }
+
+      const updatedOrder = response.data.order
+
+      // Update local state
+      updateOrder(currentOrder.id, updatedOrder)
+
+      // Show success message
+      showSuccess('Order Updated', `Order ${currentOrder.id} has been updated successfully`)
+
+      // Log activity
+      if (user) {
+        await logEditActivity(
+          user.id,
+          user.name || 'Unknown User',
+          'Order',
+          currentOrder.id,
+          `Updated order ${currentOrder.id}`,
+          {},
+          updateData
+        )
+      }
+
+      setIsEditOpen(false)
+      setCurrentOrder(null)
+
+    } catch (error) {
+      console.error('Error updating order:', error)
+      showError('Order Update Failed', error instanceof Error ? error.message : 'Failed to update order')
+    }
+  }
+
   // Helper function to get transport cost based on region
   const getTransportCostForRegion = (regionId: string) => {
     // First try to get cost from transport tariffs API
@@ -1091,12 +1172,18 @@ const OrdersPage = () => {
     return shippingCosts[regionId] || 0
   }
   const canEditOrder = (order: Order) => {
+    // Operations Team can edit any order
+    if (user?.role === "operations") {
+      return true
+    }
+    
+    // Admin and Regional Managers can edit any order
     if (user?.role === "admin" || user?.role === "regional_manager") {
       return true
     }
     
     // Allow supervisors to edit orders from their assigned cities
-  if (user?.role === "supervisor") {
+    if (user?.role === "supervisor") {
       const supervisorCities = ["Biskra", "Ouled Djellal", "Oued Souf", "El Mghair"]
       const client = clients.find(c => c.id === order.client_id)
       if (client) {
@@ -1749,6 +1836,12 @@ const OrdersPage = () => {
                                   <Info className="mr-2 h-3 w-3" />
                                   View Details
                                 </DropdownMenuItem>
+                                {canEditOrder(order) && (
+                                  <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                                    <Edit className="mr-2 h-3 w-3" />
+                                    Edit Order
+                                  </DropdownMenuItem>
+                                )}
                                 {canApproveOrder(order) && (
                                   <DropdownMenuItem onClick={() => handleApproveOrder(order)}>
                                     <CheckCircle className="mr-2 h-3 w-3" />
@@ -1803,15 +1896,7 @@ const OrdersPage = () => {
                                   </>
                                 )}
                                 {canEditOrder(order) && (
-                                  <DropdownMenuItem onClick={() => {
-                                    const editData = {
-                                      assigned_to: prompt('Enter assigned to (optional):') || undefined,
-                                      delivery_date: prompt('Enter delivery date (YYYY-MM-DD, optional):') || undefined,
-                                      total_price: prompt('Enter total price (optional):') || undefined,
-                                      notes: prompt('Enter notes (optional):') || undefined
-                                    }
-                                    handleEditOrder(order, editData)
-                                  }}>
+                                  <DropdownMenuItem onClick={() => handleEditOrder(order)}>
                                     <Edit className="mr-2 h-3 w-3" />
                                     Edit Order
                                   </DropdownMenuItem>
