@@ -1,11 +1,144 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  createOrderApprovalNotification, 
-  createOrderRejectionNotification, 
-  createOrderStatusUpdateNotification, 
-  createBLNumberUpdateNotification, 
-  createOrderEditNotification 
-} from '../../notifications/route'
+
+// Mock notifications storage
+let notifications: any[] = []
+
+// Function to create order approval notification for Supervisor
+function createOrderApprovalNotification(orderData: any, supervisorId: string, blNumber: string) {
+  const orderId = orderData.id || "Unknown Order"
+  const clientName = orderData.clients?.name || "Unknown Client"
+  
+  const supervisorNotification = {
+    id: `NOTIF-${Date.now()}-APPROVAL`,
+    title: "Order Approved",
+    message: `Your order ${orderId} for ${clientName} has been approved with BL Number: ${blNumber}`,
+    type: "order",
+    priority: "high",
+    target_role: "supervisor",
+    target_user_id: supervisorId,
+    is_read: false,
+    created_by: "operations-team",
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    order_id: orderId,
+    bl_number: blNumber
+  }
+  
+  notifications.push(supervisorNotification)
+  return supervisorNotification
+}
+
+// Function to create order rejection notification for Supervisor
+function createOrderRejectionNotification(orderData: any, supervisorId: string, reason?: string) {
+  const orderId = orderData.id || "Unknown Order"
+  const clientName = orderData.clients?.name || "Unknown Client"
+  
+  const supervisorNotification = {
+    id: `NOTIF-${Date.now()}-REJECTION`,
+    title: "Order Rejected",
+    message: `Your order ${orderId} for ${clientName} has been rejected${reason ? ': ' + reason : ''}`,
+    type: "order",
+    priority: "high",
+    target_role: "supervisor",
+    target_user_id: supervisorId,
+    is_read: false,
+    created_by: "operations-team",
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    order_id: orderId,
+    rejection_reason: reason
+  }
+  
+  notifications.push(supervisorNotification)
+  return supervisorNotification
+}
+
+// Function to create order status update notification for Supervisor
+function createOrderStatusUpdateNotification(orderData: any, supervisorId: string, newStatus: string, trackingInfo?: any) {
+  const orderId = orderData.id || "Unknown Order"
+  const clientName = orderData.clients?.name || "Unknown Client"
+  
+  const statusMessages = {
+    'pending': 'is pending approval',
+    'processing': 'is being processed',
+    'in_progress': 'is in progress',
+    'in_transit': 'is in transit (on the way)',
+    'delivered': 'has been delivered',
+    'cancelled': 'has been cancelled'
+  }
+  
+  const statusMessage = statusMessages[newStatus as keyof typeof statusMessages] || `status updated to ${newStatus}`
+  
+  const supervisorNotification = {
+    id: `NOTIF-${Date.now()}-STATUS`,
+    title: "Order Status Updated",
+    message: `Your order ${orderId} for ${clientName} ${statusMessage}`,
+    type: "order",
+    priority: "medium",
+    target_role: "supervisor",
+    target_user_id: supervisorId,
+    is_read: false,
+    created_by: "operations-team",
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    order_id: orderId,
+    new_status: newStatus,
+    tracking_info: trackingInfo
+  }
+  
+  notifications.push(supervisorNotification)
+  return supervisorNotification
+}
+
+// Function to create BL number update notification for Supervisor
+function createBLNumberUpdateNotification(orderData: any, supervisorId: string, blNumber: string) {
+  const orderId = orderData.id || "Unknown Order"
+  const clientName = orderData.clients?.name || "Unknown Client"
+  
+  const supervisorNotification = {
+    id: `NOTIF-${Date.now()}-BL`,
+    title: "BL Number Updated",
+    message: `BL Number for your order ${orderId} (${clientName}) has been updated to: ${blNumber}`,
+    type: "order",
+    priority: "medium",
+    target_role: "supervisor",
+    target_user_id: supervisorId,
+    is_read: false,
+    created_by: "operations-team",
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    order_id: orderId,
+    bl_number: blNumber
+  }
+  
+  notifications.push(supervisorNotification)
+  return supervisorNotification
+}
+
+// Function to create order edit notification for Supervisor
+function createOrderEditNotification(orderData: any, supervisorId: string, editedFields: string[]) {
+  const orderId = orderData.id || "Unknown Order"
+  const clientName = orderData.clients?.name || "Unknown Client"
+  
+  const supervisorNotification = {
+    id: `NOTIF-${Date.now()}-EDIT`,
+    title: "Order Modified",
+    message: `Your order ${orderId} for ${clientName} has been modified by Operations Team. Fields updated: ${editedFields.join(', ')}`,
+    type: "order",
+    priority: "medium",
+    target_role: "supervisor",
+    target_user_id: supervisorId,
+    is_read: false,
+    created_by: "operations-team",
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    order_id: orderId,
+    edited_fields: editedFields
+  }
+  
+  notifications.push(supervisorNotification)
+  return supervisorNotification
+}
 
 // Demo orders data (copied from route.ts to avoid circular imports)
 const demoOrders = [
