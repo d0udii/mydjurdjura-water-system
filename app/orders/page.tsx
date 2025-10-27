@@ -491,26 +491,38 @@ const OrdersPage = () => {
         updated_at: new Date().toISOString(),
         clients: clients.find(c => c.id === orderData.client_id),
         regions: regions.find(r => r.id === orderData.region_id),
+        // BL number is NOT automatically generated - Operations Team will assign it
+        bl_number: null,
+        approved_by: null,
+        approved_at: null
       }
 
-      // Create order via API to ensure persistence
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...newOrder,
-          created_by: user?.id || 'unknown'
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create order')
+      // Create order via API to ensure persistence with validation
+      const orderPayload = {
+        client_id: orderData.client_id,
+        region_id: orderData.region_id,
+        assigned_to: "USR-004", // Operations team
+        total_price: totalPrice,
+        product_5_5L_pallets: orderData.product_5_5L_pallets,
+        product_1_5L_pallets: orderData.product_1_5L_pallets,
+        truck_type: orderData.truck_type,
+        truck_capacity: truckCapacity,
+        delivery_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: orderData.notes || "",
+        created_by: user?.id || 'unknown',
+        // BL number is NOT automatically generated - Operations Team will assign it
+        bl_number: null,
+        approved_by: null,
+        approved_at: null
       }
 
-      const createdOrder = await response.json()
+      const response = await ordersApi.create(orderPayload)
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create order')
+      }
+
+      const createdOrder = response.data
       
       // Update local state immediately for real-time UI update
       setOrders(prev => [createdOrder.order, ...prev])
@@ -519,7 +531,7 @@ const OrdersPage = () => {
       await sendOrderNotifications(createdOrder.order)
       
       // Show success message
-      showEditSuccessToast('Order', `${newOrder.id} created successfully`)
+      showSuccess('Order Created', `Order ${createdOrder.order.id} has been created and saved to database`)
       
       // Log activity
       if (user) {
@@ -546,7 +558,7 @@ const OrdersPage = () => {
       
     } catch (error) {
       console.error("Failed to create order:", error)
-      showEditErrorToast('Order', error instanceof Error ? error.message : 'Failed to create order')
+      showError('Order Creation Failed', error instanceof Error ? error.message : 'Failed to create order')
       throw error
     }
   }
