@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Edit, Trash2, MoreHorizontal, Download, Search, Filter, RefreshCw, Package, Truck, CheckCircle, XCircle, AlertCircle, ClipboardList } from "lucide-react"
+import { useDataStore } from '@/lib/shared-data-store'
 
 // Mock auth hook for demo
 const useAuth = () => ({
@@ -54,8 +54,8 @@ interface Order {
 
 function PalletTrackingPage() {
   const { user } = useAuth()
+  const { orders, refreshData } = useDataStore()
   const [palletTracking, setPalletTracking] = useState<PalletTracking[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -144,13 +144,36 @@ function PalletTrackingPage() {
   ]
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setPalletTracking(demoPalletTracking)
-      setOrders(demoOrders)
-      setLoading(false)
-    }, 1000)
-  }, [])
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch pallet tracking data
+        const trackingResponse = await fetch('/api/pallet-tracking')
+        if (trackingResponse.ok) {
+          const trackingData = await trackingResponse.json()
+          setPalletTracking(trackingData.palletTracking || [])
+        }
+        
+        // Refresh orders from shared data store
+        await refreshData()
+        
+      } catch (error) {
+        console.error('Error fetching pallet tracking data:', error)
+        // Fallback to demo data
+        setPalletTracking(demoPalletTracking)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+    
+    // Set up real-time updates
+    const interval = setInterval(fetchData, 10000) // Update every 10 seconds
+    
+    return () => clearInterval(interval)
+  }, [refreshData])
 
   const calculatePalletsFromOrder = (order: Order) => {
     const totalPallets = order.product_5_5L_pallets + order.product_1_5L_pallets
@@ -163,8 +186,30 @@ function PalletTrackingPage() {
   const handleCreateTracking = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.order_id || !formData.wooden_pallets_sent || !formData.intercalaires_sent) {
-      alert("Please fill all required fields")
+    // Validate required fields with proper handling of zero values
+    if (!formData.order_id || formData.order_id.trim() === '') {
+      alert("Please select an order")
+      return
+    }
+    
+    if (formData.wooden_pallets_sent === undefined || formData.wooden_pallets_sent === null || formData.wooden_pallets_sent === '') {
+      alert("Please enter wooden pallets sent quantity")
+      return
+    }
+    
+    if (formData.intercalaires_sent === undefined || formData.intercalaires_sent === null || formData.intercalaires_sent === '') {
+      alert("Please enter intercalaires sent quantity")
+      return
+    }
+    
+    // Validate that quantities are non-negative
+    if (parseInt(formData.wooden_pallets_sent) < 0) {
+      alert("Wooden pallets sent cannot be negative")
+      return
+    }
+    
+    if (parseInt(formData.intercalaires_sent) < 0) {
+      alert("Intercalaires sent cannot be negative")
       return
     }
 
@@ -202,7 +247,7 @@ function PalletTrackingPage() {
         setPalletTracking(prev => [data.palletTracking, ...prev])
         setIsCreateOpen(false)
         resetForm()
-        alert(data.message)
+        alert(data.message || 'Pallet tracking record created successfully')
       } else {
         const error = await response.json()
         alert(error.error || 'Failed to create pallet tracking')

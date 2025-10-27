@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAllOrders } from '@/lib/shared-api-data'
 
 // Mock pallet tracking storage (in production, this would be in Supabase)
 let palletTracking: any[] = [
@@ -68,10 +69,61 @@ export async function POST(request: NextRequest) {
       notes
     } = data
     
-    // Validation
-    if (!order_id || !client_id || !wooden_pallets_sent || !intercalaires_sent) {
+    // Validation - Check for required fields with proper handling of zero values
+    if (!order_id || order_id.trim() === '') {
       return NextResponse.json(
-        { error: 'Order ID, Client ID, and pallet quantities are required' },
+        { error: 'Order ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (!client_id || client_id.trim() === '') {
+      return NextResponse.json(
+        { error: 'Client ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    // Check if pallet quantities are provided (including zero values)
+    if (wooden_pallets_sent === undefined || wooden_pallets_sent === null || wooden_pallets_sent === '') {
+      return NextResponse.json(
+        { error: 'Wooden pallets sent quantity is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (intercalaires_sent === undefined || intercalaires_sent === null || intercalaires_sent === '') {
+      return NextResponse.json(
+        { error: 'Intercalaires sent quantity is required' },
+        { status: 400 }
+      )
+    }
+    
+    // Validate that quantities are non-negative numbers
+    if (parseInt(wooden_pallets_sent) < 0) {
+      return NextResponse.json(
+        { error: 'Wooden pallets sent cannot be negative' },
+        { status: 400 }
+      )
+    }
+    
+    // Validate that order exists and get client_id if not provided
+    const orders = getAllOrders()
+    const order = orders.find(o => o.id === order_id)
+    
+    if (!order) {
+      return NextResponse.json(
+        { error: 'Order not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Use order's client_id if not provided in request
+    const finalClientId = client_id || order.client_id
+    
+    if (!finalClientId) {
+      return NextResponse.json(
+        { error: 'Client ID is required and could not be determined from order' },
         { status: 400 }
       )
     }
@@ -92,7 +144,7 @@ export async function POST(request: NextRequest) {
     const newTracking = {
       id: `PALLET-${String(Date.now()).slice(-6)}`,
       order_id,
-      client_id,
+      client_id: finalClientId,
       wooden_pallets_sent: parseInt(wooden_pallets_sent),
       intercalaires_sent: parseInt(intercalaires_sent),
       wooden_pallets_returned: parseInt(wooden_pallets_returned) || 0,
@@ -105,7 +157,22 @@ export async function POST(request: NextRequest) {
       notes: notes || "",
       status,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      // Include related order and client data for immediate display
+      order: {
+        id: order.id,
+        client_id: order.client_id,
+        status: order.status,
+        total_price: order.total_price,
+        delivery_date: order.delivery_date,
+        clients: order.clients
+      },
+      client: {
+        id: finalClientId,
+        name: order.clients?.name || 'Unknown Client',
+        phone: order.clients?.phone || '',
+        address: order.clients?.address || ''
+      }
     }
     
     palletTracking.push(newTracking)
