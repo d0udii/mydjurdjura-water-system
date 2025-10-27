@@ -45,8 +45,7 @@ import {
   XCircle,
   AlertTriangle
 } from "lucide-react"
-import { useAuth } from "@/lib/auth"
-import { withAuth } from "@/lib/auth"
+import { useDataStore } from "@/lib/shared-data-store"
 import { format } from "date-fns"
 import { ExportButton } from "@/components/export-utils"
 import { AdvancedAnalytics } from "@/components/advanced-analytics"
@@ -78,6 +77,7 @@ interface ReportData {
 
 function ReportsPage() {
   const { user } = useAuth()
+  const { orders, clients, supervisors, refreshData } = useDataStore()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState("30")
@@ -86,14 +86,60 @@ function ReportsPage() {
     client: "all",
     supervisor: "all", 
     city: "all",
-    dateRange: "30"
+    dateRange: "30",
+    status: "all",
+    region: "all"
   })
-  const [clients, setClients] = useState<any[]>([])
-  const [supervisors, setSupervisors] = useState<any[]>([])
+  const [regions, setRegions] = useState<any[]>([])
+  const [statuses] = useState([
+    { value: "all", label: "All Statuses" },
+    { value: "pending", label: "Pending" },
+    { value: "processing", label: "Processing" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "delivered", label: "Delivered" },
+    { value: "cancelled", label: "Cancelled" }
+  ])
+
+  // Load saved filters from localStorage on component mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem('reports-filters')
+    const savedChartType = localStorage.getItem('reports-chart-type')
+    const savedDateRange = localStorage.getItem('reports-date-range')
+    
+    if (savedFilters) {
+      setFilters(JSON.parse(savedFilters))
+    }
+    if (savedChartType) {
+      setChartType(savedChartType)
+    }
+    if (savedDateRange) {
+      setDateRange(savedDateRange)
+    }
+  }, [])
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('reports-filters', JSON.stringify(filters))
+  }, [filters])
+
+  useEffect(() => {
+    localStorage.setItem('reports-chart-type', chartType)
+  }, [chartType])
+
+  useEffect(() => {
+    localStorage.setItem('reports-date-range', dateRange)
+  }, [dateRange])
 
   useEffect(() => {
     fetchReportData()
     fetchFilterData()
+    
+    // Set up real-time updates every 10 seconds
+    const interval = setInterval(() => {
+      fetchReportData()
+    }, 10000)
+    
+    return () => clearInterval(interval)
   }, [dateRange, filters])
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -108,28 +154,124 @@ function ReportsPage() {
       client: "all",
       supervisor: "all", 
       city: "all",
-      dateRange: "30"
+      dateRange: "30",
+      status: "all",
+      region: "all"
     })
   }
 
   const fetchFilterData = async () => {
     try {
-      const [clientsRes, supervisorsRes] = await Promise.all([
-        fetch('/api/clients'),
-        fetch('/api/supervisors')
-      ])
-
+      // Use data from shared store for clients and supervisors
+      // Fetch regions from clients API
+      const clientsRes = await fetch('/api/clients')
       if (clientsRes.ok) {
         const clientsData = await clientsRes.json()
-        setClients(clientsData.clients || [])
-      }
-
-      if (supervisorsRes.ok) {
-        const supervisorsData = await supervisorsRes.json()
-        setSupervisors(supervisorsData.supervisors || [])
+        setRegions(clientsData.regions || [])
       }
     } catch (error) {
       console.error('Error fetching filter data:', error)
+    }
+  }
+
+  // Calculate report data from filtered orders
+  const calculateReportData = (filteredOrders: any[], clients: any[], supervisors: any[], regions: any[]): ReportData => {
+    const totalOrders = filteredOrders.length
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.total_price || 0), 0)
+    const totalClients = clients.length
+    const totalUsers = supervisors.length
+
+    // Orders by status
+    const ordersByStatus = filteredOrders.reduce((acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    // Revenue by region
+    const revenueByRegion = regions.map(region => {
+      const regionOrders = filteredOrders.filter(order => order.region_id === region.id)
+      return {
+        region: region.name,
+        revenue: regionOrders.reduce((sum, order) => sum + (order.total_price || 0), 0),
+        orders: regionOrders.length
+      }
+    })
+
+    // Orders by month (last 6 months)
+    const ordersByMonth = []
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' })
+      
+      const monthOrders = filteredOrders.filter(order => {
+        const orderDate = new Date(order.created_at)
+        return orderDate.getMonth() === date.getMonth() && orderDate.getFullYear() === date.getFullYear()
+      })
+      
+      ordersByMonth.push({
+        month: monthName,
+        orders: monthOrders.length,
+        revenue: monthOrders.reduce((sum, order) => sum + (order.total_price || 0), 0)
+      })
+    }
+
+    // Top clients
+    const clientOrders = filteredOrders.reduce((acc, order) => {
+      const client = clients.find(c => c.id === order.client_id)
+      if (client) {
+        if (!acc[client.id]) {
+          acc[client.id] = { name: client.name, orders: 0, revenue: 0 }
+        }
+        acc[client.id].orders += 1
+        acc[client.id].revenue += order.total_price || 0
+      }
+      return acc
+    }, {} as Record<string, any>)
+
+    const topClients = Object.values(clientOrders)
+      .sort((a: any, b: any) => b.revenue - a.revenue)
+      .slice(0, 5)
+
+    // User activity
+    const userActivity = supervisors.map(supervisor => ({
+      role: supervisor.role || 'Supervisor',
+      count: 1,
+      active: 1
+    }))
+
+    // Delivery performance by city
+    const deliveryPerformance = clients.map(client => {
+      const clientOrders = filteredOrders.filter(order => order.client_id === client.id)
+      const city = client.address?.split(',')[1]?.trim() || client.address?.split(',')[0]?.trim() || 'Unknown'
+      
+      return {
+        city,
+        delivered: clientOrders.filter(o => o.status === 'delivered').length,
+        pending: clientOrders.filter(o => o.status === 'pending').length,
+        delayed: clientOrders.filter(o => o.status === 'cancelled').length
+      }
+    })
+
+    // Growth calculations (mock for now)
+    const revenueGrowth = 15.2
+    const orderGrowth = 12.8
+    const clientGrowth = 8.5
+
+    return {
+      totalOrders,
+      totalRevenue,
+      totalClients,
+      totalUsers,
+      ordersByStatus,
+      revenueByRegion,
+      ordersByMonth,
+      topClients,
+      userActivity,
+      deliveryPerformance,
+      revenueGrowth,
+      orderGrowth,
+      clientGrowth
     }
   }
 
@@ -137,76 +279,41 @@ function ReportsPage() {
     try {
       setLoading(true)
       
-      // Build query parameters based on filters
-      const queryParams = new URLSearchParams()
-      if (filters.client !== "all") queryParams.append('client_id', filters.client)
-      if (filters.supervisor !== "all") queryParams.append('supervisor_id', filters.supervisor)
-      if (filters.city !== "all") queryParams.append('city', filters.city)
-      if (filters.dateRange !== "all") queryParams.append('days', filters.dateRange)
+      // Use orders from shared data store, filtered by parameters
+      let filteredOrders = orders
       
-      // Fetch real-time order data with filters
-      const ordersResponse = await fetch(`/api/orders?${queryParams.toString()}`)
-      let ordersData = null
-      
-      if (ordersResponse.ok) {
-        ordersData = await ordersResponse.json()
+      // Apply filters to the orders
+      if (filters.client !== "all") {
+        filteredOrders = filteredOrders.filter(order => order.client_id === filters.client)
+      }
+      if (filters.supervisor !== "all") {
+        filteredOrders = filteredOrders.filter(order => order.assigned_to === filters.supervisor)
+      }
+      if (filters.city !== "all") {
+        filteredOrders = filteredOrders.filter(order => 
+          order.clients?.address?.toLowerCase().includes(filters.city.toLowerCase())
+        )
+      }
+      if (filters.status !== "all") {
+        filteredOrders = filteredOrders.filter(order => order.status === filters.status)
+      }
+      if (filters.region !== "all") {
+        filteredOrders = filteredOrders.filter(order => order.region_id === filters.region)
+      }
+      if (filters.dateRange !== "all") {
+        const daysAgo = new Date()
+        daysAgo.setDate(daysAgo.getDate() - parseInt(filters.dateRange))
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.created_at) >= daysAgo
+        )
       }
       
-      // Demo data with comprehensive analytics (enhanced with real order data)
-      const demoData: ReportData = {
-        totalOrders: ordersData?.stats?.totalOrders || 156,
-        totalRevenue: ordersData?.stats?.totalRevenue || 2345000,
-        totalClients: 45,
-        totalUsers: 12,
-        ordersByStatus: {
-          pending: ordersData?.stats?.pendingOrders || 23,
-          approved: 18,
-          in_progress: ordersData?.stats?.inProgressOrders || 31,
-          delivered: ordersData?.stats?.deliveredOrders || 78,
-          returned: 4,
-          cancelled: 2
-        },
-        revenueByRegion: [
-          { region: "East", revenue: ordersData?.stats?.totalRevenue || 1250000, orders: ordersData?.stats?.totalOrders || 89 },
-          { region: "West", revenue: 750000, orders: 45 },
-          { region: "Center", revenue: 345000, orders: 22 }
-        ],
-        ordersByMonth: [
-          { month: "Jan", orders: ordersData?.stats?.totalOrders || 45, revenue: ordersData?.stats?.totalRevenue || 680000 },
-          { month: "Feb", orders: 52, revenue: 780000 },
-          { month: "Mar", orders: 38, revenue: 570000 },
-          { month: "Apr", orders: 61, revenue: 920000 },
-          { month: "May", orders: 48, revenue: 720000 },
-          { month: "Jun", orders: 55, revenue: 830000 }
-        ],
-        topClients: [
-          { name: "Biskra Water Distributor", orders: 23, revenue: 345000 },
-          { name: "Ouled Djellal Store", orders: 18, revenue: 270000 },
-          { name: "Tebessa Distribution", orders: 15, revenue: 225000 },
-          { name: "El Mghair Trading", orders: 12, revenue: 180000 },
-          { name: "Oued Souf Market", orders: 10, revenue: 150000 }
-        ],
-        userActivity: [
-          { role: "Admin", count: 2, active: 2 },
-          { role: "Regional Manager", count: 3, active: 3 },
-          { role: "Supervisor", count: 4, active: 3 },
-          { role: "Operations", count: 3, active: 3 }
-        ],
-        deliveryPerformance: [
-          { city: "Biskra", delivered: 45, pending: 8, delayed: 2 },
-          { city: "Ouled Djellal", delivered: 32, pending: 5, delayed: 1 },
-          { city: "Tebessa", delivered: 28, pending: 6, delayed: 3 },
-          { city: "El Mghair", delivered: 22, pending: 4, delayed: 1 },
-          { city: "Oued Souf", delivered: 18, pending: 3, delayed: 2 }
-        ],
-        revenueGrowth: 12.5,
-        orderGrowth: 8.3,
-        clientGrowth: 15.2
-      }
-
-      setData(demoData)
+      // Calculate report data from filtered orders
+      const reportData = calculateReportData(filteredOrders, clients, supervisors, regions)
+      setData(reportData)
+      
     } catch (error) {
-      console.error("Failed to fetch report data:", error)
+      console.error('Error fetching report data:', error)
     } finally {
       setLoading(false)
     }
@@ -373,7 +480,7 @@ function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
                   Filter by Client
@@ -403,6 +510,39 @@ function ReportsPage() {
                     <SelectItem value="all">All Supervisors</SelectItem>
                     {supervisors.map(supervisor => (
                       <SelectItem key={supervisor.id} value={supervisor.id}>{supervisor.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Filter by Region
+                </label>
+                <Select value={filters.region} onValueChange={(value) => handleFilterChange('region', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Regions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Regions</SelectItem>
+                    {regions.map(region => (
+                      <SelectItem key={region.id} value={region.id}>{region.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Filter by Status
+                </label>
+                <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statuses.map(status => (
+                      <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
