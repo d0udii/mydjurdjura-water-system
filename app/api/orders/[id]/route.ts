@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { 
+  createOrderApprovalNotification, 
+  createOrderRejectionNotification, 
+  createOrderStatusUpdateNotification, 
+  createBLNumberUpdateNotification, 
+  createOrderEditNotification 
+} from '../../notifications/route'
 
 // Demo orders data (copied from route.ts to avoid circular imports)
 const demoOrders = [
@@ -177,14 +184,7 @@ export async function PATCH(
       updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
-      const supervisorNotification = {
-        user_id: order.created_by,
-        title: "Order Approved",
-        message: `Order ${order.id} has been approved and assigned BL number ${generatedBlNumber}`,
-        type: "success",
-        order_id: order.id,
-        created_at: new Date().toISOString()
-      }
+      const supervisorNotification = createOrderApprovalNotification(order, order.created_by, generatedBlNumber)
 
       return NextResponse.json({
         order: updatedOrder,
@@ -208,14 +208,7 @@ export async function PATCH(
       updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
-      const supervisorNotification = {
-        user_id: order.created_by,
-        title: "Order Rejected",
-        message: `Order ${order.id} has been rejected${rejection_reason ? ': ' + rejection_reason : ''}`,
-        type: "error",
-        order_id: order.id,
-        created_at: new Date().toISOString()
-      }
+      const supervisorNotification = createOrderRejectionNotification(order, order.created_by, rejection_reason)
 
       return NextResponse.json({
         order: updatedOrder,
@@ -245,14 +238,7 @@ export async function PATCH(
       updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
-      const supervisorNotification = {
-        user_id: order.created_by,
-        title: "BL Number Updated",
-        message: `Order ${order.id} BL number updated to ${bl_number}`,
-        type: "info",
-        order_id: order.id,
-        created_at: new Date().toISOString()
-      }
+      const supervisorNotification = createBLNumberUpdateNotification(order, order.created_by, bl_number)
 
       return NextResponse.json({
         order: updatedOrder,
@@ -278,14 +264,7 @@ export async function PATCH(
       updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
-      const supervisorNotification = {
-        user_id: order.created_by,
-        title: "Tracking Updated",
-        message: `Order ${order.id} tracking information has been updated`,
-        type: "info",
-        order_id: order.id,
-        created_at: new Date().toISOString()
-      }
+      const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, order.status, tracking_info)
 
       return NextResponse.json({
         order: updatedOrder,
@@ -294,50 +273,34 @@ export async function PATCH(
       })
     }
 
-    if (action === 'edit') {
-      const { 
-        assigned_to, 
-        delivery_date, 
-        total_price, 
-        product_5_5L_pallets, 
-        product_1_5L_pallets, 
-        truck_type, 
-        truck_capacity, 
-        notes, 
-        user_id 
-      } = body
+    if (action === 'update_status') {
+      const { status } = body
+      const validStatuses = ['pending', 'processing', 'in_progress', 'in_transit', 'delivered', 'cancelled']
+      
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { error: 'Invalid status' },
+          { status: 400 }
+        )
+      }
 
       const updatedOrder = {
         ...order,
-        ...(assigned_to && { assigned_to }),
-        ...(delivery_date && { delivery_date }),
-        ...(total_price && { total_price }),
-        ...(product_5_5L_pallets && { product_5_5L_pallets }),
-        ...(product_1_5L_pallets && { product_1_5L_pallets }),
-        ...(truck_type && { truck_type }),
-        ...(truck_capacity && { truck_capacity }),
-        ...(notes && { notes }),
+        status: status,
         updated_at: new Date().toISOString(),
-        edited_by: user_id || 'operations-team',
-        edited_at: new Date().toISOString()
+        status_updated_by: user_id || 'operations-team',
+        status_updated_at: new Date().toISOString()
       }
 
       updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
-      const supervisorNotification = {
-        user_id: order.created_by,
-        title: "Order Edited",
-        message: `Order ${order.id} has been edited by operations team`,
-        type: "info",
-        order_id: order.id,
-        created_at: new Date().toISOString()
-      }
+      const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, status)
 
       return NextResponse.json({
         order: updatedOrder,
         notification: supervisorNotification,
-        message: 'Order edited successfully'
+        message: `Order status updated to ${status}`
       })
     }
 
