@@ -13,13 +13,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Package, Plus, Edit, Trash2, MoreHorizontal, FileText, FileSpreadsheet, Download, MapPin, Phone, Calculator, Truck, Info, User, CheckCircle, Clock, AlertCircle, RefreshCw, Smartphone, Wifi, WifiOff, Crown, Shield, Zap, Lock, Unlock } from "lucide-react"
+import { Package, Plus, Edit, Trash2, MoreHorizontal, FileText, FileSpreadsheet, Download, MapPin, Phone, Calculator, Truck, Info, User, CheckCircle, Clock, AlertCircle, RefreshCw, Smartphone, Wifi, WifiOff, Crown, Shield, Zap, Lock, Unlock, Save, AlertTriangle } from "lucide-react"
 import { ExportButton } from "@/components/export-utils"
 import { MobileOrderForm } from "@/components/mobile-order-form"
 import { offlineStorage, networkManager } from '@/lib/offline-storage'
 import { getAdminPermissions, isAdmin, getAdminBadge, getAdminColors } from "@/lib/admin-permissions"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
+import { useToast } from "@/lib/toast-context"
+import { useAutoSave } from "@/hooks/use-auto-save"
+import { ordersApi } from "@/lib/api-client"
+import { validateOrder } from "@/lib/validation"
 import {
   AnimatedDiv,
   FloatingElement,
@@ -152,6 +156,7 @@ interface TransportTariff {
 const OrdersPage = () => {
   const { user } = useAuth()
   const { orders, clients, addOrder, updateOrder, refreshData } = useDataStore()
+  const { showSuccess, showError, showWarning } = useToast()
   const [regions, setRegions] = useState<Region[]>([])
   const [transportTariffs, setTransportTariffs] = useState<TransportTariff[]>([])
   const [loading, setLoading] = useState(true)
@@ -176,6 +181,37 @@ const OrdersPage = () => {
     product_1_5L_pallets: 0,
     truck_type: "factory",
     notes: "",
+  })
+
+  // Auto-save functionality for form data
+  const { isSaving, hasUnsavedChanges, lastSaved, save, reset } = useAutoSave(formData, {
+    delay: 3000,
+    validate: async (data) => {
+      if (!data.client_id || !data.region_id) return false
+      if (data.product_5_5L_pallets === 0 && data.product_1_5L_pallets === 0) return false
+      return true
+    },
+    onSave: async (data) => {
+      if (currentOrder) {
+        // Update existing order
+        const response = await ordersApi.update(currentOrder.id, {
+          ...currentOrder,
+          ...data,
+          total_price: calculateTotalPrice(data.product_5_5L_pallets, data.product_1_5L_pallets)
+        })
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to update order')
+        }
+        
+        updateOrder(currentOrder.id, response.data)
+      }
+    },
+    onError: (error) => {
+      showError('Auto-save Failed', error.message)
+    },
+    enabled: isEditOpen && currentOrder !== null,
+    showToast: false // We'll handle toasts manually
   })
   
   // State for selected client details

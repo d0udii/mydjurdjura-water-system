@@ -7,6 +7,8 @@ import { Sidebar } from "@/components/sidebar"
 import { AuthProvider } from "@/lib/auth"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ConditionalLayout } from "@/components/conditional-layout"
+import { ToastProvider } from "@/lib/toast-context"
+import { Toaster } from "@/components/ui/sonner"
 
 import { Geist_Mono, Poppins as V0_Font_Poppins, Geist_Mono as V0_Font_Geist_Mono, Source_Serif_4 as V0_Font_Source_Serif_4 } from 'next/font/google'
 
@@ -49,12 +51,15 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <ConditionalLayout>
-              {children}
-            </ConditionalLayout>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <ConditionalLayout>
+                {children}
+              </ConditionalLayout>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
+        <Toaster />
         <Analytics />
       </body>
     </html>
