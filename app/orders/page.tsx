@@ -704,22 +704,6 @@ const OrdersPage = () => {
     }
   }
 
-  const handleEditOrder = async (order: Order) => {
-    setCurrentOrder(order)
-    setFormData({
-      client_id: order.client_id,
-      region_id: order.region_id,
-      product_5_5L_pallets: order.product_5_5L_pallets,
-      product_1_5L_pallets: order.product_1_5L_pallets,
-      truck_type: order.truck_type,
-      notes: order.notes || "",
-    })
-    
-    // Fetch client details for the order being edited
-    await fetchClientDetails(order.client_id)
-    
-    setIsEditOpen(true)
-  }
 
   const handleUpdateOrder = async (e: React.FormEvent) => {
     e.preventDefault()

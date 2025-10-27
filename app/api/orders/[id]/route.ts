@@ -389,33 +389,3 @@ export async function PUT(
     )
   }
 }
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const orderIndex = getAllOrders().findIndex(o => o.id === id)
-
-    if (orderIndex === -1) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      )
-    }
-
-    // Remove the order
-    const deletedOrder = demoOrders.splice(orderIndex, 1)[0]
-
-    return NextResponse.json({ 
-      message: 'Order deleted successfully',
-      order: deletedOrder 
-    })
-  } catch (error) {
-    console.error('Error deleting order:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
