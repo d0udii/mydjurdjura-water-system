@@ -1002,10 +1002,6 @@ const OrdersPage = () => {
     return user?.role === 'operations' && order.status !== 'cancelled' && order.status !== 'deleted'
   }
 
-  const canEditOrder = (order: Order) => {
-    return user?.role === 'operations' && order.status !== 'delivered' && order.status !== 'cancelled' && order.status !== 'deleted'
-  }
-
   const canDeleteOrder = (order: Order) => {
     return user?.role === 'operations' && order.status !== 'delivered'
   }
