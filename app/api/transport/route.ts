@@ -6,7 +6,7 @@ export async function GET() {
 
   try {
     const tariffs = getAllTariffs()
-    return Response.json(tariffs)
+    return Response.json({ transport: tariffs })
   } catch (error) {
     return Response.json({ error: "Failed to fetch tariffs" }, { status: 500 })
   }

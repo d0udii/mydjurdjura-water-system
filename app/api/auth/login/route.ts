@@ -2,10 +2,14 @@ import { login } from "@/lib/auth"
 import { initializeDatabase } from "@/lib/db"
 
 export async function POST(request: Request) {
-  initializeDatabase()
-
   try {
+    initializeDatabase()
+
     const { email, password } = await request.json()
+
+    if (!email || !password) {
+      return Response.json({ error: "Email and password are required" }, { status: 400 })
+    }
 
     const session = login(email, password)
 
@@ -26,6 +30,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
-    return Response.json({ error: "Internal server error" }, { status: 500 })
+    console.error('Login error:', error)
+    return Response.json({ error: "Internal server error", details: error.message }, { status: 500 })
   }
 }

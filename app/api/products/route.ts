@@ -6,7 +6,7 @@ export async function GET() {
 
   try {
     const products = getAllProducts()
-    return Response.json(products)
+    return Response.json({ products })
   } catch (error) {
     return Response.json({ error: "Failed to fetch products" }, { status: 500 })
   }
