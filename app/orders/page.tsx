@@ -818,56 +818,6 @@ const OrdersPage = () => {
     }
   }
 
-  const handleDeleteOrder = async (orderId: string) => {
-    try {
-      const orderToDelete = orders.find(order => order.id === orderId)
-      if (!orderToDelete) {
-        showEditErrorToast('Order', 'Order not found')
-        return
-      }
-
-      // Delete via API
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete order')
-      }
-
-      // Update local state
-      setOrders(prev => prev.filter(order => order.id !== orderId))
-
-      // Show success toast
-      const clientName = orderToDelete.clients?.name || 'Unknown Client'
-      showDeleteSuccessToast('Order', `${orderId} for ${clientName}`)
-
-      // Log activity
-      if (user) {
-        await logDeleteActivity(
-          user.id,
-          user.name || 'Unknown User',
-          'Order',
-          orderId,
-          `${orderId} for ${clientName}`,
-          {
-            client_id: orderToDelete.client_id,
-            region_id: orderToDelete.region_id,
-            product_5_5L_pallets: orderToDelete.product_5_5L_pallets,
-            product_1_5L_pallets: orderToDelete.product_1_5L_pallets,
-            truck_type: orderToDelete.truck_type,
-            total_price: orderToDelete.total_price,
-            status: orderToDelete.status
-          }
-        )
-      }
-
-    } catch (error) {
-      console.error("Failed to delete order:", error)
-      showDeleteErrorToast('Order', error instanceof Error ? error.message : 'Failed to delete order')
-    }
-  }
 
   const handleRejectOrder = async (order: Order, rejectionReason?: string) => {
     try {
