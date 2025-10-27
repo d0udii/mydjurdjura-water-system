@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "./theme-toggle"
 import { NotificationsPanel } from "./notifications-panel"
+import { NotificationBell } from "./notification-bell"
 import { useAuth } from "@/lib/auth"
 import {
   LayoutDashboard,
@@ -191,10 +192,10 @@ export function Sidebar() {
       roles: ["admin", "operations"] 
     },
     { 
-      href: "/reports", 
-      label: "Reports", 
-      icon: BarChart3, 
-      roles: ["admin", "regional_manager", "supervisor"] 
+      href: "/notifications", 
+      label: "Notifications", 
+      icon: Bell, 
+      roles: ["admin", "regional_manager", "supervisor", "operations"] 
     },
     {
       href: "/settings",
@@ -275,7 +276,7 @@ export function Sidebar() {
 
               <div className="flex items-center justify-between">
                 <ThemeToggle />
-                <NotificationsPanel />
+                <NotificationBell userId={user.id} userRole={user.role} />
                 <Button variant="destructive" size="sm" onClick={handleLogout} className="hover:bg-red-600 transition-all duration-200 transform hover:scale-105">
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout

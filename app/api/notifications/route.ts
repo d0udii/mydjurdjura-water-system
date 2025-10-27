@@ -406,6 +406,54 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+// Function to mark notification as read
+export async function markNotificationAsRead(notificationId: string) {
+  const notificationIndex = notifications.findIndex(n => n.id === notificationId)
+  if (notificationIndex !== -1) {
+    notifications[notificationIndex] = {
+      ...notifications[notificationIndex],
+      is_read: true,
+      read_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    return notifications[notificationIndex]
+  }
+  return null
+}
+
+// Function to mark all notifications as read for a user
+export async function markAllNotificationsAsRead(userId: string, userRole: string) {
+  const userNotifications = notifications.filter(n => 
+    (n.target_role === "all" || n.target_role === userRole) &&
+    (n.target_user_id === null || n.target_user_id === userId) &&
+    !n.is_read
+  )
+  
+  userNotifications.forEach(notification => {
+    const index = notifications.findIndex(n => n.id === notification.id)
+    if (index !== -1) {
+      notifications[index] = {
+        ...notifications[index],
+        is_read: true,
+        read_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
+  })
+  
+  return userNotifications.length
+}
+
+// Function to get unread notification count
+export function getUnreadNotificationCount(userId: string, userRole: string) {
+  return notifications.filter(n => 
+    (n.target_role === "all" || n.target_role === userRole) &&
+    (n.target_user_id === null || n.target_user_id === userId) &&
+    !n.is_read &&
+    (!n.expires_at || new Date(n.expires_at) > new Date())
+  ).length
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
