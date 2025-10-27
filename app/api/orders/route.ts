@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sharedOrders, addOrder, updateOrder, getAllOrders } from '@/lib/shared-api-data'
-import { createOrderNotification } from '../notifications/route'
 
 // Helper function to calculate promotion discount
 function calculatePromotionDiscount(order: any, promotions: any[]): number {
@@ -227,11 +225,17 @@ export async function POST(request: NextRequest) {
     }
     
     // Add to demo orders array (in production, this would be saved to database)
-    // Add to shared data store
-    addOrder(newOrder)
+    // Add to demo orders
+    demoOrders.unshift(newOrder)
     
-    // Create automatic notifications
-    const notifications = createOrderNotification(newOrder, orderData.created_by || 'unknown')
+    // Create automatic notifications (simplified for now)
+    const notifications = {
+      type: 'order_created',
+      title: 'New Order Created',
+      message: `Order ${newOrder.id} has been created`,
+      recipient_id: orderData.created_by || 'unknown',
+      order_id: newOrder.id
+    }
     
     return NextResponse.json({
       message: 'Order created successfully',
@@ -250,14 +254,51 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const userRole = searchParams.get('user_role')
+    const userId = searchParams.get('user_id')
+    const regionId = searchParams.get('region_id')
+    const status = searchParams.get('status')
+    const assignedTo = searchParams.get('assigned_to')
+    
+    let filteredOrders = [...demoOrders]
+    
+    // Filter based on user role and permissions
+    if (userRole === 'operations') {
+      // Operations Team can see all orders
+      // No additional filtering needed
+    } else if (userRole === 'supervisor') {
+      // Supervisors can only see orders they created or are assigned to
+      filteredOrders = filteredOrders.filter(order => 
+        order.created_by === userId || order.assigned_to === userId
+      )
+    } else if (userRole === 'regional_manager') {
+      // Regional managers can see orders in their region
+      if (regionId) {
+        filteredOrders = filteredOrders.filter(order => order.region_id === regionId)
+      }
+    }
+    
+    // Apply additional filters
+    if (status) {
+      filteredOrders = filteredOrders.filter(order => order.status === status)
+    }
+    
+    if (assignedTo) {
+      filteredOrders = filteredOrders.filter(order => order.assigned_to === assignedTo)
+    }
+    
+    // Sort by creation date (newest first)
+    filteredOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    
     return NextResponse.json({ 
-      orders: getAllOrders(),
+      orders: filteredOrders,
       stats: {
-        totalOrders: getAllOrders().length,
-        pendingOrders: getAllOrders().filter(o => o.status === 'pending').length,
-        inProgressOrders: getAllOrders().filter(o => o.status === 'in_progress').length,
-        deliveredOrders: getAllOrders().filter(o => o.status === 'delivered').length,
-        totalRevenue: getAllOrders().reduce((sum, o) => sum + o.total_price, 0)
+        totalOrders: filteredOrders.length,
+        pendingOrders: filteredOrders.filter(o => o.status === 'pending').length,
+        inProgressOrders: filteredOrders.filter(o => o.status === 'in_progress').length,
+        deliveredOrders: filteredOrders.filter(o => o.status === 'delivered').length,
+        totalRevenue: filteredOrders.reduce((sum, o) => sum + o.total_price, 0)
       }
     })
   } catch (error) {

@@ -1,12 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOrderById, updateOrder as updateSharedOrder, getAllOrders } from '@/lib/shared-api-data'
 
-export async function GET(
+// Demo orders data (copied from route.ts to avoid circular imports)
+const demoOrders = [
+  {
+    id: "ORD-001",
+    client_id: "CLI-001",
+    region_id: "REG-001",
+    assigned_to: "USR-004",
+    status: "pending",
+    total_price: 125000,
+    product_5_5L_pallets: 11,
+    product_1_5L_pallets: 11,
+    truck_type: "factory",
+    truck_capacity: 22,
+    delivery_date: "2024-01-15",
+    notes: "Urgent delivery",
+    bl_number: null,
+    approved_by: null,
+    approved_at: null,
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+    created_by: "demo-mahmoud@djurdjura.dz",
+    clients: {
+      id: "CLI-001",
+      name: "Samir Mennacer",
+      phone: "0540233149",
+      address: "Tolga, Biskra",
+      region_id: "REG-001"
+    },
+    regions: {
+      id: "REG-001",
+      name: "Biskra Region",
+      responsible: "Hamouch",
+      supervisor_id: "demo-mahmoud@djurdjura.dz"
+    }
+  },
+  {
+    id: "ORD-002",
+    client_id: "CLI-002",
+    region_id: "REG-001",
+    assigned_to: "USR-004",
+    status: "processing",
+    total_price: 95000,
+    product_5_5L_pallets: 8,
+    product_1_5L_pallets: 8,
+    truck_type: "client_own",
+    truck_capacity: 16,
+    delivery_date: "2024-01-20",
+    notes: "Regular delivery",
+    bl_number: "BL-2024-001",
+    approved_by: "USR-004",
+    approved_at: "2024-01-02T00:00:00Z",
+    created_at: "2024-01-02T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z",
+    created_by: "demo-ahmed@djurdjura.dz",
+    clients: {
+      id: "CLI-002",
+      name: "Ahmed Benali",
+      phone: "0555123456",
+      address: "Ouled Djellal",
+      region_id: "REG-001"
+    },
+    regions: {
+      id: "REG-001",
+      name: "Biskra Region",
+      responsible: "Hamouch",
+      supervisor_id: "demo-mahmoud@djurdjura.dz"
+    }
+  }
+]
+
+// Helper functions
+function getOrderById(id: string) {
+  return demoOrders.find(order => order.id === id)
+}
+
+function updateOrder(id: string, updatedOrder: any) {
+  const index = demoOrders.findIndex(order => order.id === id)
+  if (index !== -1) {
+    demoOrders[index] = updatedOrder
+  }
+}
+
+export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
+    const { user_role, user_id } = await request.json().catch(() => ({}))
+    
     const order = getOrderById(id)
 
     if (!order) {
@@ -16,9 +99,43 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(order)
+    // Check permissions - only operations team and admin can delete orders
+    if (user_role !== 'operations' && user_role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Insufficient permissions to delete orders' },
+        { status: 403 }
+      )
+    }
+
+    // Soft delete by updating status to 'deleted'
+    const deletedOrder = {
+      ...order,
+      status: 'deleted',
+      deleted_by: user_id || 'operations-team',
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+
+    updateOrder(id, deletedOrder)
+
+    // Create notification for supervisor
+    const supervisorNotification = {
+      user_id: order.created_by,
+      title: "Order Deleted",
+      message: `Order ${order.id} has been deleted by operations team`,
+      type: "error",
+      order_id: order.id,
+      created_at: new Date().toISOString()
+    }
+
+    return NextResponse.json({
+      order: deletedOrder,
+      notification: supervisorNotification,
+      message: 'Order deleted successfully'
+    })
+
   } catch (error) {
-    console.error('Error fetching order:', error)
+    console.error('Error deleting order:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -57,7 +174,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      updateSharedOrder(id, updatedOrder)
+      updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = {
@@ -76,30 +193,62 @@ export async function PATCH(
       })
     }
 
-    if (action === 'update_status') {
-      const { status } = body
-      const validStatuses = ['pending', 'processing', 'in_transit', 'delivered', 'cancelled']
+    if (action === 'reject') {
+      const { rejection_reason, user_id } = body
       
-      if (!validStatuses.includes(status)) {
+      const updatedOrder = {
+        ...order,
+        status: 'rejected',
+        rejected_by: user_id || 'operations-team',
+        rejected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        rejection_reason: rejection_reason || 'Order rejected by operations team'
+      }
+
+      updateOrder(id, updatedOrder)
+
+      // Create notification for supervisor
+      const supervisorNotification = {
+        user_id: order.created_by,
+        title: "Order Rejected",
+        message: `Order ${order.id} has been rejected${rejection_reason ? ': ' + rejection_reason : ''}`,
+        type: "error",
+        order_id: order.id,
+        created_at: new Date().toISOString()
+      }
+
+      return NextResponse.json({
+        order: updatedOrder,
+        notification: supervisorNotification,
+        message: 'Order rejected successfully'
+      })
+    }
+
+    if (action === 'update_bl_number') {
+      const { bl_number, user_id } = body
+      
+      if (!bl_number) {
         return NextResponse.json(
-          { error: 'Invalid status' },
+          { error: 'BL number is required' },
           { status: 400 }
         )
       }
 
       const updatedOrder = {
         ...order,
-        status,
-        updated_at: new Date().toISOString()
+        bl_number: bl_number,
+        updated_at: new Date().toISOString(),
+        bl_updated_by: user_id || 'operations-team',
+        bl_updated_at: new Date().toISOString()
       }
 
-      updateSharedOrder(id, updatedOrder)
+      updateOrder(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = {
         user_id: order.created_by,
-        title: "Order Status Updated",
-        message: `Order ${order.id} status has been updated to ${status}`,
+        title: "BL Number Updated",
+        message: `Order ${order.id} BL number updated to ${bl_number}`,
         type: "info",
         order_id: order.id,
         created_at: new Date().toISOString()
@@ -108,7 +257,87 @@ export async function PATCH(
       return NextResponse.json({
         order: updatedOrder,
         notification: supervisorNotification,
-        message: `Order status updated to ${status}`
+        message: `BL number updated to ${bl_number}`
+      })
+    }
+
+    if (action === 'update_tracking') {
+      const { tracking_info, user_id } = body
+      
+      const updatedOrder = {
+        ...order,
+        tracking_info: {
+          ...order.tracking_info,
+          ...tracking_info,
+          last_updated: new Date().toISOString(),
+          updated_by: user_id || 'operations-team'
+        },
+        updated_at: new Date().toISOString()
+      }
+
+      updateOrder(id, updatedOrder)
+
+      // Create notification for supervisor
+      const supervisorNotification = {
+        user_id: order.created_by,
+        title: "Tracking Updated",
+        message: `Order ${order.id} tracking information has been updated`,
+        type: "info",
+        order_id: order.id,
+        created_at: new Date().toISOString()
+      }
+
+      return NextResponse.json({
+        order: updatedOrder,
+        notification: supervisorNotification,
+        message: 'Tracking information updated successfully'
+      })
+    }
+
+    if (action === 'edit') {
+      const { 
+        assigned_to, 
+        delivery_date, 
+        total_price, 
+        product_5_5L_pallets, 
+        product_1_5L_pallets, 
+        truck_type, 
+        truck_capacity, 
+        notes, 
+        user_id 
+      } = body
+
+      const updatedOrder = {
+        ...order,
+        ...(assigned_to && { assigned_to }),
+        ...(delivery_date && { delivery_date }),
+        ...(total_price && { total_price }),
+        ...(product_5_5L_pallets && { product_5_5L_pallets }),
+        ...(product_1_5L_pallets && { product_1_5L_pallets }),
+        ...(truck_type && { truck_type }),
+        ...(truck_capacity && { truck_capacity }),
+        ...(notes && { notes }),
+        updated_at: new Date().toISOString(),
+        edited_by: user_id || 'operations-team',
+        edited_at: new Date().toISOString()
+      }
+
+      updateOrder(id, updatedOrder)
+
+      // Create notification for supervisor
+      const supervisorNotification = {
+        user_id: order.created_by,
+        title: "Order Edited",
+        message: `Order ${order.id} has been edited by operations team`,
+        type: "info",
+        order_id: order.id,
+        created_at: new Date().toISOString()
+      }
+
+      return NextResponse.json({
+        order: updatedOrder,
+        notification: supervisorNotification,
+        message: 'Order edited successfully'
       })
     }
 

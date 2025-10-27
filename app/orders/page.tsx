@@ -885,7 +885,7 @@ const OrdersPage = () => {
     }
   }
 
-  const handleApproveOrder = async (order: Order) => {
+  const handleRejectOrder = async (order: Order, rejectionReason?: string) => {
     try {
       const response = await fetch(`/api/orders/${order.id}`, {
         method: 'PATCH',
@@ -893,23 +893,134 @@ const OrdersPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'approve',
-          approved_by: user?.id || 'USR-004'
+          action: 'reject',
+          rejection_reason: rejectionReason,
+          user_id: user?.id || 'USR-004'
         })
       })
 
-        if (response.ok) {
-          const data = await response.json()
-          // Update the order in shared data store
-          updateOrder(order.id, data.order)
-          alert(data.message)
-        } else {
-          const error = await response.json()
-          alert(error.error || 'Failed to approve order')
-        }
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to reject order')
+      }
     } catch (error) {
-      console.error("Failed to approve order:", error)
-      alert('Failed to approve order')
+      console.error("Failed to reject order:", error)
+      alert('Failed to reject order')
+    }
+  }
+
+  const handleUpdateBLNumber = async (order: Order, blNumber: string) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update_bl_number',
+          bl_number: blNumber,
+          user_id: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update BL number')
+      }
+    } catch (error) {
+      console.error("Failed to update BL number:", error)
+      alert('Failed to update BL number')
+    }
+  }
+
+  const handleUpdateTracking = async (order: Order, trackingInfo: any) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update_tracking',
+          tracking_info: trackingInfo,
+          user_id: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to update tracking')
+      }
+    } catch (error) {
+      console.error("Failed to update tracking:", error)
+      alert('Failed to update tracking')
+    }
+  }
+
+  const handleEditOrder = async (order: Order, editData: any) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'edit',
+          ...editData,
+          user_id: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to edit order')
+      }
+    } catch (error) {
+      console.error("Failed to edit order:", error)
+      alert('Failed to edit order')
+    }
+  }
+
+  const handleDeleteOrder = async (order: Order) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_role: user?.role || 'operations',
+          user_id: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        alert(data.message)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to delete order')
+      }
+    } catch (error) {
+      console.error("Failed to delete order:", error)
+      alert('Failed to delete order')
     }
   }
 
@@ -943,6 +1054,30 @@ const OrdersPage = () => {
 
   const canApproveOrder = (order: Order) => {
     return user?.role === 'operations' && order.status === 'pending'
+  }
+
+  const canRejectOrder = (order: Order) => {
+    return user?.role === 'operations' && (order.status === 'pending' || order.status === 'processing')
+  }
+
+  const canUpdateBLNumber = (order: Order) => {
+    return user?.role === 'operations' && order.status !== 'cancelled' && order.status !== 'deleted'
+  }
+
+  const canUpdateTracking = (order: Order) => {
+    return user?.role === 'operations' && order.status !== 'cancelled' && order.status !== 'deleted'
+  }
+
+  const canEditOrder = (order: Order) => {
+    return user?.role === 'operations' && order.status !== 'delivered' && order.status !== 'cancelled' && order.status !== 'deleted'
+  }
+
+  const canDeleteOrder = (order: Order) => {
+    return user?.role === 'operations' && order.status !== 'delivered'
+  }
+
+  const canCreateOrder = () => {
+    return user?.role === 'operations' || user?.role === 'supervisor'
   }
 
   const canUpdateOrderStatus = (order: Order) => {
@@ -1662,6 +1797,37 @@ const OrdersPage = () => {
                                     Approve Order
                                   </DropdownMenuItem>
                                 )}
+                                {canRejectOrder(order) && (
+                                  <DropdownMenuItem onClick={() => {
+                                    const reason = prompt('Enter rejection reason (optional):')
+                                    handleRejectOrder(order, reason || undefined)
+                                  }}>
+                                    <AlertCircle className="mr-2 h-3 w-3" />
+                                    Reject Order
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdateBLNumber(order) && (
+                                  <DropdownMenuItem onClick={() => {
+                                    const blNumber = prompt('Enter BL Number:', order.bl_number || '')
+                                    if (blNumber) handleUpdateBLNumber(order, blNumber)
+                                  }}>
+                                    <FileText className="mr-2 h-3 w-3" />
+                                    Update BL Number
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdateTracking(order) && (
+                                  <DropdownMenuItem onClick={() => {
+                                    const trackingInfo = {
+                                      location: prompt('Enter current location:') || '',
+                                      estimated_delivery: prompt('Enter estimated delivery date (YYYY-MM-DD):') || '',
+                                      notes: prompt('Enter tracking notes:') || ''
+                                    }
+                                    handleUpdateTracking(order, trackingInfo)
+                                  }}>
+                                    <MapPin className="mr-2 h-3 w-3" />
+                                    Update Tracking
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdateOrderStatus(order) && (
                                   <>
                                     <DropdownMenuItem onClick={() => handleUpdateOrderStatus(order, 'processing')}>
@@ -1679,9 +1845,27 @@ const OrdersPage = () => {
                                   </>
                                 )}
                                 {canEditOrder(order) && (
-                                  <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                                  <DropdownMenuItem onClick={() => {
+                                    const editData = {
+                                      assigned_to: prompt('Enter assigned to (optional):') || undefined,
+                                      delivery_date: prompt('Enter delivery date (YYYY-MM-DD, optional):') || undefined,
+                                      total_price: prompt('Enter total price (optional):') || undefined,
+                                      notes: prompt('Enter notes (optional):') || undefined
+                                    }
+                                    handleEditOrder(order, editData)
+                                  }}>
                                     <Edit className="mr-2 h-3 w-3" />
                                     Edit Order
+                                  </DropdownMenuItem>
+                                )}
+                                {canDeleteOrder(order) && (
+                                  <DropdownMenuItem onClick={() => {
+                                    if (confirm('Are you sure you want to delete this order?')) {
+                                      handleDeleteOrder(order)
+                                    }
+                                  }}>
+                                    <Trash2 className="mr-2 h-3 w-3" />
+                                    Delete Order
                                   </DropdownMenuItem>
                                 )}
                                 {canDeleteOrder(order) && (
