@@ -11,6 +11,12 @@ export async function POST(request: Request) {
       return Response.json({ error: "Email and password are required" }, { status: 400 })
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return Response.json({ error: "Invalid email format" }, { status: 400 })
+    }
+
     const session = login(email, password)
 
     if (!session) {
@@ -31,6 +37,9 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Login error:', error)
-    return Response.json({ error: "Internal server error", details: error.message }, { status: 500 })
+    return Response.json({ 
+      error: "Internal server error", 
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
