@@ -1060,24 +1060,6 @@ const OrdersPage = () => {
     return false
   }
 
-  const canDeleteOrder = (order: Order) => {
-    if (user?.role === "admin") {
-      return true
-    }
-    
-    // Allow supervisors to delete orders from their assigned cities
-    if (user?.role === "supervisor") {
-      const supervisorCities = ["Biskra", "Ouled Djellal", "Oued Souf", "El Mghair"]
-      const client = clients.find(c => c.id === order.client_id)
-      if (client) {
-        const clientCity = client.address.split(',')[1]?.trim()
-        return supervisorCities.includes(clientCity)
-      }
-    }
-    
-    return false
-  }
-
   if (loading) {
     return <LoadingSpinner text="Loading Orders" subtext="Fetching your data..." />
   }
