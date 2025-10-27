@@ -1046,8 +1046,6 @@ const OrdersPage = () => {
     
     return shippingCosts[regionId] || 0
   }
-
-  const canCreateOrder = user?.role === "admin" || user?.role === "supervisor"
   const canEditOrder = (order: Order) => {
     if (user?.role === "admin" || user?.role === "regional_manager") {
       return true
