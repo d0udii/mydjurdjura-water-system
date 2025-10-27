@@ -11,7 +11,9 @@ const demoClients = [
     region_id: "REG-001",
     contact_person: "Ahmed Benali",
     rc_number: "001234567RC",
-    status: "active"
+    status: "active",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z"
   },
   {
     id: "CLI-002",
@@ -21,7 +23,9 @@ const demoClients = [
     region_id: "REG-001",
     contact_person: "Fatima Djellal",
     rc_number: "002345678RC",
-    status: "active"
+    status: "active",
+    created_at: "2024-01-02T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z"
   },
   {
     id: "CLI-003",
@@ -31,7 +35,9 @@ const demoClients = [
     region_id: "REG-001",
     contact_person: "Omar Souf",
     rc_number: "003456789RC",
-    status: "active"
+    status: "active",
+    created_at: "2024-01-03T00:00:00Z",
+    updated_at: "2024-01-03T00:00:00Z"
   },
   {
     id: "CLI-004",
@@ -41,7 +47,9 @@ const demoClients = [
     region_id: "REG-001",
     contact_person: "Amina Mghair",
     rc_number: "004567890RC",
-    status: "active"
+    status: "active",
+    created_at: "2024-01-04T00:00:00Z",
+    updated_at: "2024-01-04T00:00:00Z"
   },
   {
     id: "CLI-029",
@@ -51,7 +59,9 @@ const demoClients = [
     region_id: "REG-001",
     contact_person: "Samir Mennacer",
     rc_number: "123456789RC",
-    status: "active"
+    status: "active",
+    created_at: "2024-01-05T00:00:00Z",
+    updated_at: "2024-01-05T00:00:00Z"
   }
 ]
 

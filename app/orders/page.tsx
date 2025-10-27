@@ -306,9 +306,18 @@ const OrdersPage = () => {
         // Extract city from client address
         const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
         
-        // Update selected client details
+        // Update selected client details with comprehensive information
         setSelectedClientDetails({
-          client: client,
+          client: {
+            ...client,
+            // Ensure all fields are present
+            name: client.name || 'Unknown Client',
+            phone: client.phone || 'No Phone',
+            address: client.address || 'No Address',
+            contact_person: client.contact_person || client.name,
+            rc_number: client.rc_number || 'No RC Number',
+            region_id: client.region_id || 'Unknown Region'
+          },
           region: region || null,
           city: city
         })
@@ -328,7 +337,15 @@ const OrdersPage = () => {
           const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
           
           setSelectedClientDetails({
-            client: client,
+            client: {
+              ...client,
+              name: client.name || 'Unknown Client',
+              phone: client.phone || 'No Phone',
+              address: client.address || 'No Address',
+              contact_person: client.contact_person || client.name,
+              rc_number: client.rc_number || 'No RC Number',
+              region_id: client.region_id || 'Unknown Region'
+            },
             region: region || null,
             city: city
           })
@@ -352,7 +369,15 @@ const OrdersPage = () => {
         const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
         
         setSelectedClientDetails({
-          client: client,
+          client: {
+            ...client,
+            name: client.name || 'Unknown Client',
+            phone: client.phone || 'No Phone',
+            address: client.address || 'No Address',
+            contact_person: client.contact_person || client.name,
+            rc_number: client.rc_number || 'No RC Number',
+            region_id: client.region_id || 'Unknown Region'
+          },
           region: region || null,
           city: city
         })

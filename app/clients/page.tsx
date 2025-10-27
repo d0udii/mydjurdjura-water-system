@@ -615,6 +615,7 @@ function ClientsPage() {
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-left">Contact</TableHead>
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-left">Location</TableHead>
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-left">Region</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-left">Supervisor</TableHead>
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-center">Status</TableHead>
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-left">Created</TableHead>
                     <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
@@ -661,8 +662,31 @@ function ClientsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4">
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {regions.find(r => r.id === client.region_id)?.name || 'Unknown'}
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {regions.find(r => r.id === client.region_id)?.name || 'Unknown'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {regions.find(r => r.id === client.region_id)?.responsible || 'No Manager'}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="space-y-1">
+                          {(() => {
+                            const region = regions.find(r => r.id === client.region_id)
+                            const supervisor = supervisors.find(s => s.region_id === client.region_id)
+                            return (
+                              <>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {supervisor?.name || 'Unassigned'}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {supervisor?.email || 'No Email'}
+                                </div>
+                              </>
+                            )
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="py-4 text-center">
