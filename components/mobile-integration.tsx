@@ -41,8 +41,7 @@ import {
   Zap,
   Activity
 } from "lucide-react"
-import { useAuth } from "@/lib/auth"
-import { withAuth } from "@/lib/auth"
+import { useDataStore } from "@/lib/shared-data-store"
 
 interface MobileApp {
   id: string

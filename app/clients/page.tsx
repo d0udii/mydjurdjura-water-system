@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Edit, Trash2, MoreHorizontal, Download, Phone, Mail, MapPin, User, Building, Eye, CheckCircle, XCircle, Clock, Users, RefreshCw, UserCheck, ShoppingCart, DollarSign, Crown, Shield, Zap, Lock, Unlock, Search, Filter } from "lucide-react"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
-import { useAuth, withAuth } from "@/lib/auth"
+import { useDataStore } from "@/lib/shared-data-store"
 
 interface Client {
   id: string
@@ -46,8 +46,7 @@ interface Region {
 
 function ClientsPage() {
   const { user } = useAuth()
-  const [clients, setClients] = useState<Client[]>([])
-  const [supervisors, setSupervisors] = useState<Supervisor[]>([])
+  const { clients, supervisors, addClient, updateClient, refreshData } = useDataStore()
   const [regions, setRegions] = useState<Region[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -136,7 +135,8 @@ function ClientsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setClients(prev => [data.client, ...prev])
+        // Add to shared data store for real-time updates
+        addClient(data.client)
         setIsCreateOpen(false)
         resetForm()
         showEditSuccessToast('Client', formData.name)
