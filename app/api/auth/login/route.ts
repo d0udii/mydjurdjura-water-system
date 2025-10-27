@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid email format" }, { status: 400 })
     }
 
+    // Use the login function directly
     const session = login(email, password)
 
     if (!session) {

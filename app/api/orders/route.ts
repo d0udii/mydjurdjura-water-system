@@ -78,6 +78,24 @@ export async function POST(request: NextRequest) {
     // Generate new order ID
     const newOrderId = `ORD-${Date.now()}`
     
+    // Calculate total price if not provided
+    let totalPrice = orderData.total_price
+    if (!totalPrice || totalPrice === 0) {
+      // Calculate product costs
+      const product5_5LPrice = (orderData.product_5_5L_pallets || 0) * 212 * 65 // 212 bottles per pallet × 65 DA
+      const product1_5LPrice = (orderData.product_1_5L_pallets || 0) * 112 * 178.5 // 112 bottles per pallet × 178.5 DA
+      const productTotal = product5_5LPrice + product1_5LPrice
+      
+      // Calculate transport cost
+      const transportCost = orderData.truck_type === "factory" ? 
+        (orderData.region_id === "REG-001" ? 31000 : 
+         orderData.region_id === "REG-002" ? 30000 :
+         orderData.region_id === "REG-003" ? 47000 :
+         orderData.region_id === "REG-004" ? 42000 : 35000) : 0
+      
+      totalPrice = productTotal + transportCost
+    }
+    
     // Create new order with proper structure
     const newOrder = {
       id: newOrderId,
@@ -85,7 +103,7 @@ export async function POST(request: NextRequest) {
       region_id: orderData.region_id,
       assigned_to: orderData.assigned_to || "USR-004", // Operations team
       status: "pending",
-      total_price: orderData.total_price,
+      total_price: totalPrice,
       product_5_5L_pallets: orderData.product_5_5L_pallets,
       product_1_5L_pallets: orderData.product_1_5L_pallets,
       truck_type: orderData.truck_type,

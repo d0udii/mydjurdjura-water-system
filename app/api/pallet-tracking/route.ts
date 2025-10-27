@@ -85,24 +85,37 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if pallet quantities are provided (including zero values)
-    if (wooden_pallets_sent === undefined || wooden_pallets_sent === null || wooden_pallets_sent === '') {
+    // Support both old field names and new field names
+    const woodenPalletsSent = wooden_pallets_sent !== undefined ? wooden_pallets_sent : 
+                             data.pallet_5_5L_quantity !== undefined ? data.pallet_5_5L_quantity : 0
+    const intercalairesSent = intercalaires_sent !== undefined ? intercalaires_sent : 
+                              data.pallet_1_5L_quantity !== undefined ? data.pallet_1_5L_quantity : 0
+    
+    if (woodenPalletsSent === undefined || woodenPalletsSent === null || woodenPalletsSent === '') {
       return NextResponse.json(
-        { error: 'Wooden pallets sent quantity is required' },
+        { error: 'Pallet quantities are required (5.5L or wooden pallets)' },
         { status: 400 }
       )
     }
     
-    if (intercalaires_sent === undefined || intercalaires_sent === null || intercalaires_sent === '') {
+    if (intercalairesSent === undefined || intercalairesSent === null || intercalairesSent === '') {
       return NextResponse.json(
-        { error: 'Intercalaires sent quantity is required' },
+        { error: 'Pallet quantities are required (1.5L or intercalaires)' },
         { status: 400 }
       )
     }
     
     // Validate that quantities are non-negative numbers
-    if (parseInt(wooden_pallets_sent) < 0) {
+    if (parseInt(woodenPalletsSent) < 0) {
       return NextResponse.json(
-        { error: 'Wooden pallets sent cannot be negative' },
+        { error: 'Pallet quantities cannot be negative' },
+        { status: 400 }
+      )
+    }
+    
+    if (parseInt(intercalairesSent) < 0) {
+      return NextResponse.json(
+        { error: 'Pallet quantities cannot be negative' },
         { status: 400 }
       )
     }
@@ -131,7 +144,7 @@ export async function POST(request: NextRequest) {
     // Calculate status based on returns
     let status = "no_return"
     if (wooden_pallets_returned > 0 || intercalaires_returned > 0) {
-      const totalPalletsSent = wooden_pallets_sent + intercalaires_sent
+      const totalPalletsSent = parseInt(woodenPalletsSent) + parseInt(intercalairesSent)
       const totalReturned = wooden_pallets_returned + intercalaires_returned
       
       if (totalReturned === totalPalletsSent) {
@@ -145,8 +158,8 @@ export async function POST(request: NextRequest) {
       id: `PALLET-${String(Date.now()).slice(-6)}`,
       order_id,
       client_id: finalClientId,
-      wooden_pallets_sent: parseInt(wooden_pallets_sent),
-      intercalaires_sent: parseInt(intercalaires_sent),
+      wooden_pallets_sent: parseInt(woodenPalletsSent),
+      intercalaires_sent: parseInt(intercalairesSent),
       wooden_pallets_returned: parseInt(wooden_pallets_returned) || 0,
       intercalaires_returned: parseInt(intercalaires_returned) || 0,
       wooden_pallets_good_condition: parseInt(wooden_pallets_good_condition) || 0,
