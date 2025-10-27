@@ -951,34 +951,6 @@ const OrdersPage = () => {
     }
   }
 
-  const handleEditOrder = async (order: Order, editData: any) => {
-    try {
-      const response = await fetch(`/api/orders/${order.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'edit',
-          ...editData,
-          user_id: user?.id || 'USR-004'
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        updateOrder(order.id, data.order)
-        alert(data.message)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to edit order')
-      }
-    } catch (error) {
-      console.error("Failed to edit order:", error)
-      alert('Failed to edit order')
-    }
-  }
-
   const handleDeleteOrder = async (order: Order) => {
     try {
       const response = await fetch(`/api/orders/${order.id}`, {
