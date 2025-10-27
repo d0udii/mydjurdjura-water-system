@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getOrderById, updateOrder as updateSharedOrder, getAllOrders } from '@/lib/shared-api-data'
 
 // Mock notifications storage
 let notifications: any[] = []
@@ -140,86 +141,13 @@ function createOrderEditNotification(orderData: any, supervisorId: string, edite
   return supervisorNotification
 }
 
-// Demo orders data (copied from route.ts to avoid circular imports)
-const demoOrders = [
-  {
-    id: "ORD-001",
-    client_id: "CLI-001",
-    region_id: "REG-001",
-    assigned_to: "USR-004",
-    status: "pending",
-    total_price: 125000,
-    product_5_5L_pallets: 11,
-    product_1_5L_pallets: 11,
-    truck_type: "factory",
-    truck_capacity: 22,
-    delivery_date: "2024-01-15",
-    notes: "Urgent delivery",
-    bl_number: null,
-    approved_by: null,
-    approved_at: null,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-    created_by: "demo-mahmoud@djurdjura.dz",
-    clients: {
-      id: "CLI-001",
-      name: "Samir Mennacer",
-      phone: "0540233149",
-      address: "Tolga, Biskra",
-      region_id: "REG-001"
-    },
-    regions: {
-      id: "REG-001",
-      name: "Biskra Region",
-      responsible: "Hamouch",
-      supervisor_id: "demo-mahmoud@djurdjura.dz"
-    }
-  },
-  {
-    id: "ORD-002",
-    client_id: "CLI-002",
-    region_id: "REG-001",
-    assigned_to: "USR-004",
-    status: "processing",
-    total_price: 95000,
-    product_5_5L_pallets: 8,
-    product_1_5L_pallets: 8,
-    truck_type: "client_own",
-    truck_capacity: 16,
-    delivery_date: "2024-01-20",
-    notes: "Regular delivery",
-    bl_number: "BL-2024-001",
-    approved_by: "USR-004",
-    approved_at: "2024-01-02T00:00:00Z",
-    created_at: "2024-01-02T00:00:00Z",
-    updated_at: "2024-01-02T00:00:00Z",
-    created_by: "demo-ahmed@djurdjura.dz",
-    clients: {
-      id: "CLI-002",
-      name: "Ahmed Benali",
-      phone: "0555123456",
-      address: "Ouled Djellal",
-      region_id: "REG-001"
-    },
-    regions: {
-      id: "REG-001",
-      name: "Biskra Region",
-      responsible: "Hamouch",
-      supervisor_id: "demo-mahmoud@djurdjura.dz"
-    }
-  }
-]
-
 // Helper functions
-function getOrderById(id: string) {
-  return demoOrders.find(order => order.id === id)
+function getOrderByIdLocal(id: string) {
+  return getOrderById(id)
 }
 
-function updateOrder(id: string, updatedOrder: any) {
-  const index = demoOrders.findIndex(order => order.id === id)
-  if (index !== -1) {
-    demoOrders[index] = updatedOrder
-  }
+function updateOrderLocal(id: string, updatedOrder: any) {
+  updateSharedOrder(id, updatedOrder)
 }
 
 export async function DELETE(
@@ -230,7 +158,7 @@ export async function DELETE(
     const { id } = await params
     const { user_role, user_id } = await request.json().catch(() => ({}))
     
-    const order = getOrderById(id)
+    const order = getOrderByIdLocal(id)
 
     if (!order) {
       return NextResponse.json(
@@ -291,7 +219,7 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     const { action, bl_number, approved_by } = body
-    const order = getOrderById(id)
+    const order = getOrderByIdLocal(id)
 
     if (!order) {
       return NextResponse.json(
@@ -314,7 +242,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      updateOrder(id, updatedOrder)
+      updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderApprovalNotification(order, order.created_by, generatedBlNumber)
@@ -338,7 +266,7 @@ export async function PATCH(
         rejection_reason: rejection_reason || 'Order rejected by operations team'
       }
 
-      updateOrder(id, updatedOrder)
+      updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderRejectionNotification(order, order.created_by, rejection_reason)
@@ -368,7 +296,7 @@ export async function PATCH(
         bl_updated_at: new Date().toISOString()
       }
 
-      updateOrder(id, updatedOrder)
+      updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createBLNumberUpdateNotification(order, order.created_by, bl_number)
@@ -394,7 +322,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      updateOrder(id, updatedOrder)
+      updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, order.status, tracking_info)
@@ -425,7 +353,7 @@ export async function PATCH(
         status_updated_at: new Date().toISOString()
       }
 
-      updateOrder(id, updatedOrder)
+      updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, status)
