@@ -21,7 +21,8 @@ import {
   Settings,
   Play,
   Pause,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from "lucide-react"
 import { useDataStore } from "@/lib/shared-data-store"
 import { useAuth } from "@/lib/auth"
