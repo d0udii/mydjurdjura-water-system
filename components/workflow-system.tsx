@@ -24,6 +24,8 @@ import {
   RotateCcw
 } from "lucide-react"
 import { useDataStore } from "@/lib/shared-data-store"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
 
 interface WorkflowStep {
   id: string
