@@ -115,6 +115,89 @@ export let sharedOrders = [
   }
 ]
 
+// Shared clients data
+export let sharedClients = [
+  {
+    id: "CLI-001",
+    name: "Biskra Water Distributor",
+    phone: "+213 33 123 456",
+    address: "123 Main Street, Biskra",
+    region_id: "REG-001",
+    contact_person: "Ahmed Benali",
+    rc_number: "001234567RC",
+    status: "active",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: "CLI-002",
+    name: "Ouled Djellal Store",
+    phone: "+213 33 789 012",
+    address: "456 Market Square, Ouled Djellal",
+    region_id: "REG-001",
+    contact_person: "Fatima Zohra",
+    rc_number: "002345678RC",
+    status: "active",
+    created_at: "2024-01-02T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z"
+  },
+  {
+    id: "CLI-003",
+    name: "Oued Souf Market",
+    phone: "+213 33 456 789",
+    address: "789 Commercial Ave, Oued Souf",
+    region_id: "REG-001",
+    contact_person: "Mohamed Khelil",
+    rc_number: "003456789RC",
+    status: "active",
+    created_at: "2024-01-03T00:00:00Z",
+    updated_at: "2024-01-03T00:00:00Z"
+  },
+  {
+    id: "CLI-004",
+    name: "El Mghair Shop",
+    phone: "+213 33 321 654",
+    address: "321 Business St, El Mghair",
+    region_id: "REG-001",
+    contact_person: "Aicha Benali",
+    rc_number: "004567890RC",
+    status: "active",
+    created_at: "2024-01-04T00:00:00Z",
+    updated_at: "2024-01-04T00:00:00Z"
+  },
+  {
+    id: "CLI-029",
+    name: "Samir Mennacer",
+    phone: "0540233149",
+    address: "Tolga, Biskra",
+    region_id: "REG-001",
+    contact_person: "Samir Mennacer",
+    rc_number: "123456789RC",
+    status: "active",
+    created_at: "2024-01-05T00:00:00Z",
+    updated_at: "2024-01-05T00:00:00Z"
+  }
+]
+
+export function addClient(client: any) {
+  sharedClients.unshift(client)
+}
+
+export function updateClient(clientId: string, updates: any) {
+  const clientIndex = sharedClients.findIndex(c => c.id === clientId)
+  if (clientIndex !== -1) {
+    sharedClients[clientIndex] = { ...sharedClients[clientIndex], ...updates }
+  }
+}
+
+export function getClientById(clientId: string) {
+  return sharedClients.find(c => c.id === clientId)
+}
+
+export function getAllClients() {
+  return sharedClients
+}
+
 export function addOrder(order: any) {
   sharedOrders.unshift(order)
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClientAssignmentNotification } from '../notifications/route'
+import { sharedClients, addClient, getAllClients } from '@/lib/shared-api-data'
 
 // Demo clients data
 const demoClients = [
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
     const region_id = searchParams.get('region_id')
     const supervisor_id = searchParams.get('supervisor_id')
 
-    let filteredClients = demoClients
+    let filteredClients = getAllClients()
 
     if (region_id) {
       filteredClients = filteredClients.filter(client => client.region_id === region_id)
@@ -249,7 +250,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add to demo clients
-    demoClients.push(newClient)
+    addClient(newClient)
 
     // Create notifications for supervisor and regional manager
     const supervisorNotification = createClientAssignmentNotification(newClient, supervisor.id)
