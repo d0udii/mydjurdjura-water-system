@@ -6,9 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    allowImportingTsExtensions: true,
-  },
 }
 
 export default nextConfig
