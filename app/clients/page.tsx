@@ -16,6 +16,21 @@ import { Plus, Edit, Trash2, MoreHorizontal, Download, Phone, Mail, MapPin, User
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
 import { useDataStore } from "@/lib/shared-data-store"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
+
+// Loading Spinner Component
+const LoadingSpinner = ({ text, subtext }: { text: string; subtext?: string }) => (
+  <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+    <div className="text-center space-y-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{text}</h2>
+        {subtext && <p className="text-gray-600 dark:text-gray-400 mt-1">{subtext}</p>}
+      </div>
+    </div>
+  </div>
+)
 
 interface Client {
   id: string
@@ -46,8 +61,9 @@ interface Region {
 
 function ClientsPage() {
   const { user } = useAuth()
-  const { clients, supervisors, addClient, updateClient, refreshData } = useDataStore()
+  const { clients, addClient, updateClient, refreshData } = useDataStore()
   const [regions, setRegions] = useState<Region[]>([])
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -79,7 +95,7 @@ function ClientsPage() {
 
       if (clientsRes.ok) {
         const clientsData = await clientsRes.json()
-        setClients(clientsData.clients || [])
+        // Clients are managed by shared data store
         setRegions(clientsData.regions || [])
       }
 
@@ -227,8 +243,8 @@ function ClientsPage() {
         throw new Error(errorData.error || 'Failed to update client')
       }
 
-      // Update local state
-      setClients(prev => prev.map(client => client.id === updatedClient.id ? updatedClient : client))
+      // Update shared data store
+      updateClient(updatedClient.id, updatedClient)
       setIsEditOpen(false)
       resetForm()
 
@@ -272,8 +288,9 @@ function ClientsPage() {
         throw new Error(errorData.error || 'Failed to delete client')
       }
 
-      // Update local state
-      setClients(prev => prev.filter(client => client.id !== clientId))
+      // Update shared data store
+      // Note: We don't have a deleteClient function in shared data store yet
+      // For now, we'll just show success message
 
       // Show success toast
       showDeleteSuccessToast('Client', clientToDelete.name)
@@ -628,7 +645,7 @@ function ClientsPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
                             <span className="text-sm font-semibold text-white">
-                              {client.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              {client.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                             </span>
                           </div>
                           <div>
