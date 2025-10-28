@@ -470,8 +470,9 @@ const OrdersPage = () => {
       const product1_5LPrice = orderData.product_1_5L_pallets * 112 * 178.5
       const productTotal = product5_5LPrice + product1_5LPrice
       
-      // Transport cost
-      const transportCost = orderData.truck_type === "factory" ? getTransportCostForRegion(orderData.region_id) : 0
+      // Transport cost - Dynamic calculation using tariffs
+      const clientCity = orderData.clients?.address?.split(',')[1]?.trim()
+      const transportCost = orderData.truck_type === "factory" ? getTransportCostForRegion(orderData.region_id, clientCity) : 0
       const totalPrice = productTotal + transportCost
 
       const newOrder: Order = {
@@ -605,8 +606,9 @@ const OrdersPage = () => {
       const product1_5LPrice = formData.product_1_5L_pallets * 112 * 178.5  // 112 bottles per pallet * 178.5 DA per bottle
       const productTotal = product5_5LPrice + product1_5LPrice
       
-      // Transport cost - Fixed calculation
-      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(clientDetails.client.region_id) : 0
+      // Transport cost - Dynamic calculation using tariffs
+      const clientCity = clientDetails.client.address?.split(',')[1]?.trim()
+      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(clientDetails.client.region_id, clientCity) : 0
       const totalPrice = productTotal + transportCost
 
       const newOrder: Order = {
@@ -951,8 +953,9 @@ const OrdersPage = () => {
       const product1_5LPrice = formData.product_1_5L_pallets * 112 * 178.5
       const productTotal = product5_5LPrice + product1_5LPrice
       
-      // Transport cost
-      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(formData.region_id) : 0
+      // Transport cost - Dynamic calculation using tariffs
+      const clientCity = selectedClientDetails.city
+      const transportCost = formData.truck_type === "factory" ? getTransportCostForRegion(formData.region_id, clientCity) : 0
       const totalPrice = productTotal + transportCost
 
       const updateData = {
@@ -1005,9 +1008,19 @@ const OrdersPage = () => {
     }
   }
 
-  // Helper function to get transport cost based on region
-  const getTransportCostForRegion = (regionId: string) => {
-    // First try to get cost from transport tariffs API
+  // Helper function to get transport cost based on region and client city
+  const getTransportCostForRegion = (regionId: string, clientCity?: string) => {
+    // First try to get cost from transport tariffs API using client city
+    if (clientCity) {
+      const tariff = transportTariffs.find(t => 
+        t.city.toLowerCase() === clientCity.toLowerCase() && t.status === 'active'
+      )
+      if (tariff) {
+        return tariff.cost_per_pallet
+      }
+    }
+    
+    // Try to match by region name
     const region = regions.find(r => r.id === regionId)
     if (region) {
       const tariff = transportTariffs.find(t => 

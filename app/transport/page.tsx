@@ -28,8 +28,14 @@ function TransportPage() {
   const [tariffs, setTariffs] = useState<TransportTariff[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedTariff, setSelectedTariff] = useState<TransportTariff | null>(null)
   const [editForm, setEditForm] = useState({
+    city: '',
+    cost_per_pallet: 0,
+    status: 'active' as 'active' | 'inactive'
+  })
+  const [addForm, setAddForm] = useState({
     city: '',
     cost_per_pallet: 0,
     status: 'active' as 'active' | 'inactive'
@@ -53,6 +59,70 @@ function TransportPage() {
       console.error('Error fetching transport tariffs:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAddTariff = () => {
+    setAddForm({
+      city: '',
+      cost_per_pallet: 0,
+      status: 'active'
+    })
+    setIsAddDialogOpen(true)
+  }
+
+  const handleCreateTariff = async () => {
+    // Validation
+    if (!addForm.city.trim()) {
+      showEditErrorToast('Transport Tariff', 'City is required')
+      return
+    }
+    if (addForm.cost_per_pallet <= 0) {
+      showEditErrorToast('Transport Tariff', 'Cost per pallet must be greater than 0')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/transport', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(addForm),
+      })
+
+      if (response.ok) {
+        const newTariff = await response.json()
+        
+        // Update local state
+        setTariffs([newTariff, ...tariffs])
+        
+        showEditSuccessToast('Transport Tariff', `New tariff for ${addForm.city} created successfully`)
+        
+        // Log activity
+        await logEditActivity(
+          user?.id || 'unknown',
+          user?.name || 'Unknown User',
+          'Transport Tariff',
+          newTariff.id,
+          `Created new tariff for ${addForm.city}`,
+          {},
+          addForm
+        )
+        
+        setIsAddDialogOpen(false)
+        setAddForm({
+          city: '',
+          cost_per_pallet: 0,
+          status: 'active'
+        })
+      } else {
+        const errorData = await response.json()
+        showEditErrorToast('Transport Tariff', errorData.error || 'Failed to create transport tariff')
+      }
+    } catch (error) {
+      console.error('Error creating transport tariff:', error)
+      showEditErrorToast('Transport Tariff', 'Network error occurred')
     }
   }
 
@@ -223,7 +293,11 @@ function TransportPage() {
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button className={`w-full sm:w-auto ${user?.role === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}>
+            <Button 
+              onClick={handleAddTariff}
+              className={`w-full sm:w-auto ${user?.role === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}
+            >
+              <Plus className="h-4 w-4 mr-2" />
               Add Tariff
             </Button>
           </div>
@@ -318,6 +392,60 @@ function TransportPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Transport Tariff Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-green-500" />
+              Add New Transport Tariff
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="add-city">City</Label>
+              <Input
+                id="add-city"
+                value={addForm.city}
+                onChange={(e) => setAddForm({ ...addForm, city: e.target.value })}
+                placeholder="Enter city name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-cost_per_pallet">Cost per Pallet (DA)</Label>
+              <Input
+                id="add-cost_per_pallet"
+                type="number"
+                value={addForm.cost_per_pallet}
+                onChange={(e) => setAddForm({ ...addForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
+                placeholder="Enter cost per pallet"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-status">Status</Label>
+              <Select value={addForm.status} onValueChange={(value: 'active' | 'inactive') => setAddForm({ ...addForm, status: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateTariff} className="bg-green-600 hover:bg-green-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Tariff
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Transport Tariff Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

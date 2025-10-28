@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sharedOrders, addOrder, getAllOrders } from '@/lib/shared-api-data'
+import { getTariffByCity } from '@/lib/transport'
 
 // Helper function to calculate promotion discount
 function calculatePromotionDiscount(order: any, promotions: any[]): number {
@@ -86,12 +87,28 @@ export async function POST(request: NextRequest) {
       const product1_5LPrice = (orderData.product_1_5L_pallets || 0) * 112 * 178.5 // 112 bottles per pallet × 178.5 DA
       const productTotal = product5_5LPrice + product1_5LPrice
       
-      // Calculate transport cost
-      const transportCost = orderData.truck_type === "factory" ? 
-        (orderData.region_id === "REG-001" ? 31000 : 
-         orderData.region_id === "REG-002" ? 30000 :
-         orderData.region_id === "REG-003" ? 47000 :
-         orderData.region_id === "REG-004" ? 42000 : 35000) : 0
+      // Calculate transport cost using dynamic tariffs
+      let transportCost = 0
+      if (orderData.truck_type === "factory") {
+        // Get client city from the order data
+        const clientCity = orderData.clients?.address?.split(',')[1]?.trim() || 
+                          orderData.client_city || 
+                          'Biskra' // Default fallback
+        
+        // Get tariff for the city
+        const tariff = getTariffByCity(clientCity)
+        if (tariff && tariff.status === 'active') {
+          // Calculate transport cost based on total pallets
+          const totalPallets = (orderData.product_5_5L_pallets || 0) + (orderData.product_1_5L_pallets || 0)
+          transportCost = totalPallets * tariff.cost_per_pallet
+        } else {
+          // Fallback to region-based calculation if tariff not found
+          transportCost = orderData.region_id === "REG-001" ? 31000 : 
+                         orderData.region_id === "REG-002" ? 30000 :
+                         orderData.region_id === "REG-003" ? 47000 :
+                         orderData.region_id === "REG-004" ? 42000 : 35000
+        }
+      }
       
       totalPrice = productTotal + transportCost
     }
