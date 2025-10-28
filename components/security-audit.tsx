@@ -33,7 +33,8 @@ import {
   Settings,
   Bell,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Edit
 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
