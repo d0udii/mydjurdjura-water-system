@@ -180,19 +180,171 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
   const joinCollaborationSession = (sessionId: string) => {
     // Simulate joining a collaboration session
     console.log(`Joining session ${sessionId}`)
+    
+    // Update the session to include current user
+    setActiveSessions(prev => 
+      prev.map(session => 
+        session.id === sessionId 
+          ? { 
+              ...session, 
+              participants: [...session.participants, user?.id || 'current-user'],
+              last_activity: new Date().toISOString()
+            }
+          : session
+      )
+    )
+    
+    // Add notification
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Session Joined',
+      message: `You joined the collaboration session for ${activeSessions.find(s => s.id === sessionId)?.entity_name}`,
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+    
     // In a real implementation, this would send a WebSocket message
   }
 
   const leaveCollaborationSession = (sessionId: string) => {
     // Simulate leaving a collaboration session
     console.log(`Leaving session ${sessionId}`)
+    
+    // Update the session to remove current user
+    setActiveSessions(prev => 
+      prev.map(session => 
+        session.id === sessionId 
+          ? { 
+              ...session, 
+              participants: session.participants.filter(p => p !== (user?.id || 'current-user')),
+              last_activity: new Date().toISOString()
+            }
+          : session
+      )
+    )
+    
+    // Add notification
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Session Left',
+      message: `You left the collaboration session for ${activeSessions.find(s => s.id === sessionId)?.entity_name}`,
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+    
     // In a real implementation, this would send a WebSocket message
   }
 
   const sendNotification = (userId: string, message: string) => {
     // Simulate sending a notification
     console.log(`Sending notification to ${userId}: ${message}`)
+    
+    // Add notification to the list
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Message Sent',
+      message: `Notification sent to ${onlineUsers.find(u => u.id === userId)?.name || 'User'}`,
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+    
     // In a real implementation, this would send a WebSocket message
+  }
+
+  const startLiveChat = () => {
+    console.log('Starting live chat')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Live Chat Started',
+      message: 'Live chat session has been initiated',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const startSharedEditing = () => {
+    console.log('Starting shared editing')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Shared Editing Started',
+      message: 'Shared editing session has been initiated',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const startScreenShare = () => {
+    console.log('Starting screen share')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Screen Share Started',
+      message: 'Screen sharing session has been initiated',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const startVideoCall = () => {
+    console.log('Starting video call')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Video Call Started',
+      message: 'Video call session has been initiated',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const manageNotifications = () => {
+    console.log('Managing notifications')
+    // Mark all notifications as read
+    setNotifications(prev => 
+      prev.map(notif => ({ ...notif, is_read: true }))
+    )
+  }
+
+  const viewActivityFeed = () => {
+    console.log('Viewing activity feed')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Activity Feed Opened',
+      message: 'Activity feed is now being displayed',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const managePermissions = () => {
+    console.log('Managing permissions')
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Permissions Opened',
+      message: 'Permission management panel is now open',
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
+  }
+
+  const viewSessionDetails = (sessionId: string) => {
+    console.log(`Viewing details for session ${sessionId}`)
+    const session = activeSessions.find(s => s.id === sessionId)
+    const newNotification = {
+      id: `notif-${Date.now()}`,
+      title: 'Session Details Opened',
+      message: `Details for ${session?.entity_name} session are now displayed`,
+      timestamp: new Date().toISOString(),
+      is_read: false
+    }
+    setNotifications(prev => [newNotification, ...prev])
   }
 
   const getStatusColor = (status: string) => {
@@ -350,7 +502,7 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
                   <Badge variant="secondary">
                     {user.role}
                   </Badge>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => sendNotification(user.id, `Hello ${user.name}!`)}>
                     <MessageCircle className="h-4 w-4" />
                   </Button>
                 </div>
@@ -428,7 +580,7 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
                     <UserMinus className="h-4 w-4 mr-2" />
                     Leave
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={() => viewSessionDetails(session.id)}>
                     <Eye className="h-4 w-4 mr-2" />
                     View Details
                   </Button>
@@ -484,27 +636,27 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startLiveChat}>
               <MessageCircle className="h-6 w-6" />
               <span className="text-sm">Live Chat</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startSharedEditing}>
               <Edit className="h-6 w-6" />
               <span className="text-sm">Shared Editing</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startScreenShare}>
               <Eye className="h-6 w-6" />
               <span className="text-sm">Screen Share</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={manageNotifications}>
               <Bell className="h-6 w-6" />
               <span className="text-sm">Notifications</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={viewActivityFeed}>
               <Activity className="h-6 w-6" />
               <span className="text-sm">Activity Feed</span>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2">
+            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={managePermissions}>
               <Lock className="h-6 w-6" />
               <span className="text-sm">Permissions</span>
             </Button>
