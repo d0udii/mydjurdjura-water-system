@@ -126,12 +126,6 @@ export function Sidebar() {
       roles: ["admin", "operations"] 
     },
     { 
-      href: "/notifications", 
-      label: "Notifications", 
-      icon: Bell, 
-      roles: ["admin"] 
-    },
-    { 
       href: "/performance", 
       label: "Performance", 
       icon: Zap, 
