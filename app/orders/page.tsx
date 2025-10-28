@@ -34,6 +34,8 @@ import {
   ShakeElement
 } from "@/components/animations"
 import { useDataStore } from "@/lib/shared-data-store"
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
 
 // Loading Spinner Component
 const LoadingSpinner = ({ text, subtext }: { text: string; subtext?: string }) => (
@@ -115,6 +117,9 @@ interface Order {
   truck_capacity: number
   delivery_date: string
   notes?: string
+  bl_number?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
   created_at: string
   updated_at: string
   clients?: {
@@ -182,6 +187,19 @@ const OrdersPage = () => {
     truck_type: "factory",
     notes: "",
   })
+
+  // Helper function to calculate total price
+  const calculateTotalPrice = (pallet5_5L: number, pallet1_5L: number) => {
+    const product5_5LPrice = pallet5_5L * 212 * 65 // 212 bottles per pallet × 65 DA
+    const product1_5LPrice = pallet1_5L * 112 * 178.5 // 112 bottles per pallet × 178.5 DA
+    const productTotal = product5_5LPrice + product1_5LPrice
+    
+    // Add transport cost if factory truck
+    const transportCost = formData.truck_type === "factory" ? 
+      getTransportCostForRegion(formData.region_id, selectedClientDetails.city) : 0
+    
+    return productTotal + transportCost
+  }
 
   // Auto-save functionality for form data
   const { isSaving, hasUnsavedChanges, lastSaved, save, reset } = useAutoSave(formData, {
@@ -283,14 +301,14 @@ const OrdersPage = () => {
       const ordersResponse = await fetch('/api/orders')
       if (ordersResponse.ok) {
         const ordersData = await ordersResponse.json()
-        setOrders(ordersData.orders || [])
+        // Orders are managed by shared data store, no need to set local state
       } else {
         // Fallback to demo data if API fails
-        setOrders(demoOrders)
+        console.warn("Failed to fetch orders from API, using shared data store")
       }
       
       // Set clients and regions (these are relatively static)
-      setClients(demoClients)
+      // Clients are managed by shared data store
       setRegions(demoRegions)
       
       // Fetch transport tariffs
@@ -302,8 +320,6 @@ const OrdersPage = () => {
     } catch (error) {
       console.error("Failed to fetch data:", error)
       // Fallback to demo data
-      setOrders(demoOrders)
-      setClients(demoClients)
       setRegions(demoRegions)
     } finally {
       setLoading(false)
@@ -525,8 +541,8 @@ const OrdersPage = () => {
 
       const createdOrder = response.data
       
-      // Update local state immediately for real-time UI update
-      setOrders(prev => [createdOrder.order, ...prev])
+      // Update shared data store for real-time UI update
+      addOrder(createdOrder.order)
       
       // Send notifications to relevant users
       await sendOrderNotifications(createdOrder.order)
@@ -754,6 +770,32 @@ const OrdersPage = () => {
     }
   }
 
+  const handleApproveOrder = async (order: Order) => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          user_id: user?.id || 'USR-004'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        updateOrder(order.id, data.order)
+        showSuccess('Order Approved', `Order ${order.id} has been approved successfully`)
+      } else {
+        const error = await response.json()
+        showError('Approval Failed', error.error || 'Failed to approve order')
+      }
+    } catch (error) {
+      console.error('Error approving order:', error)
+      showError('Approval Failed', 'Network error occurred')
+    }
+  }
 
   const handleRejectOrder = async (order: Order, rejectionReason?: string) => {
     try {
@@ -903,11 +945,11 @@ const OrdersPage = () => {
   }
 
   const canUpdateBLNumber = (order: Order) => {
-    return user?.role === 'operations' && order.status !== 'cancelled' && order.status !== 'deleted'
+    return user?.role === 'operations' && order.status !== 'cancelled'
   }
 
   const canUpdateTracking = (order: Order) => {
-    return user?.role === 'operations' && order.status !== 'cancelled' && order.status !== 'deleted'
+    return user?.role === 'operations' && order.status !== 'cancelled'
   }
 
   const canDeleteOrder = (order: Order) => {
@@ -1151,7 +1193,7 @@ const OrdersPage = () => {
               )}
               
               {/* Create Order Button */}
-              {canCreateOrder && (
+              {canCreateOrder() && (
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                   <DialogTrigger asChild>
                     <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200">

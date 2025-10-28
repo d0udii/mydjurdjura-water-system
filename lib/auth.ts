@@ -69,6 +69,4 @@ export function getSupervisorsByChefRegion(chefRegionId: string): User[] {
   return db.users.filter((u) => u.role === "supervisor" && u.chefRegionId === chefRegionId)
 }
 
-export function getAllSupervisors(): User[] {
-  return db.users.filter((u) => u.role === "supervisor")
-}
+export { useAuth, withAuth, AuthProvider } from './auth.tsx'
