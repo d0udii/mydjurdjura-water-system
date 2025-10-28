@@ -274,7 +274,7 @@ function ProductsPage() {
                     <Badge className={product.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : product.status === 'inactive' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'}>
                       {product.status === 'active' && <CheckCircle className="h-3 w-3 mr-1" />}
                       {product.status === 'discontinued' && <XCircle className="h-3 w-3 mr-1" />}
-                      {product.status.toUpperCase()}
+                      {(product.status || 'active').toUpperCase()}
                     </Badge>
                     <span className="font-semibold text-lg">{product.unit_price} DA</span>
                   </div>

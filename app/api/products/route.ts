@@ -6,7 +6,17 @@ export async function GET() {
 
   try {
     const products = getAllProducts()
-    return Response.json({ products })
+    // Map database fields to frontend interface
+    const mappedProducts = products.map(product => ({
+      id: product.id,
+      name: product.name,
+      volume: product.volume,
+      units_per_pallet: product.unitsPerPallet,
+      unit_price: product.unitPrice,
+      status: product.status,
+      created_at: product.createdAt
+    }))
+    return Response.json({ products: mappedProducts })
   } catch (error) {
     return Response.json({ error: "Failed to fetch products" }, { status: 500 })
   }

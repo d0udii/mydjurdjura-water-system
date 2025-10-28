@@ -28,6 +28,8 @@ export interface Product {
   volume: string
   unitsPerPallet: number
   unitPrice: number
+  status: 'active' | 'inactive' | 'discontinued'
+  createdAt: string
 }
 
 export interface Order {
@@ -141,6 +143,8 @@ export function initializeDatabase() {
     volume: "5.5L",
     unitsPerPallet: 212,
     unitPrice: 65,
+    status: "active",
+    createdAt: "2024-01-01T00:00:00Z"
   })
 
   db.products.push({
@@ -149,6 +153,8 @@ export function initializeDatabase() {
     volume: "1.5L",
     unitsPerPallet: 112,
     unitPrice: 45,
+    status: "active",
+    createdAt: "2024-01-01T00:00:00Z"
   })
 
   db.transportTariffs.push({
