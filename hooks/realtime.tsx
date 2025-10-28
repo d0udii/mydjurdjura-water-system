@@ -179,14 +179,16 @@ export function useWebSocket(
       }
 
       ws.onerror = (event) => {
+        console.warn('WebSocket error:', event)
         onError?.(event)
       }
 
       setSocket(ws)
     } catch (error) {
-      console.error('WebSocket connection error:', error)
+      console.warn('WebSocket connection error:', error)
+      // Don't throw error, just log it
     }
-  }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts, reconnectAttempts])
+  }, [url, reconnectInterval, maxReconnectAttempts, reconnectAttempts])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -208,7 +210,7 @@ export function useWebSocket(
   useEffect(() => {
     connect()
     return () => disconnect()
-  }, [connect, disconnect])
+  }, [url]) // Only depend on url to prevent infinite re-renders
 
   return {
     socket,

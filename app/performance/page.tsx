@@ -64,13 +64,16 @@ function PerformancePage() {
     manualSync 
   } = useRealtimeSync('/api/orders', syncInterval * 1000, [isRealtimeEnabled])
   
-  // WebSocket connection
+  // WebSocket connection (optional - will gracefully handle connection failures)
   const { isConnected: wsConnected, sendMessage } = useWebSocket('ws://localhost:3001/ws', {
     onMessage: (event) => {
       console.log('WebSocket message:', event.data)
     },
     onOpen: () => console.log('WebSocket connected'),
-    onClose: () => console.log('WebSocket disconnected')
+    onClose: () => console.log('WebSocket disconnected'),
+    onError: () => console.log('WebSocket connection failed - this is expected in demo mode'),
+    reconnectInterval: 10000, // 10 seconds
+    maxReconnectAttempts: 3 // Limit reconnection attempts
   })
   
   // Optimistic updates
