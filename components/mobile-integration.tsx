@@ -59,7 +59,7 @@ interface MobileApp {
   rating: number
 }
 
-interface MobileIntegration {
+interface MobileIntegrationData {
   id: string
   type: 'push_notification' | 'location_tracking' | 'offline_sync' | 'camera_integration' | 'voice_command'
   name: string
@@ -86,7 +86,7 @@ interface MobileIntegrationProps {
 export const MobileIntegration: React.FC<MobileIntegrationProps> = ({ className }) => {
   const { user } = useAuth()
   const [mobileApps, setMobileApps] = useState<MobileApp[]>([])
-  const [integrations, setIntegrations] = useState<MobileIntegration[]>([])
+  const [integrations, setIntegrations] = useState<MobileIntegrationData[]>([])
   const [analytics, setAnalytics] = useState<MobileAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedApp, setSelectedApp] = useState<string>('')
@@ -161,7 +161,7 @@ export const MobileIntegration: React.FC<MobileIntegrationProps> = ({ className 
       setMobileApps(mockApps)
 
       // Mock integrations
-      const mockIntegrations: MobileIntegration[] = [
+      const mockIntegrations: MobileIntegrationData[] = [
         {
           id: 'INT-001',
           type: 'push_notification',
