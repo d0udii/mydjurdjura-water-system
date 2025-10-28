@@ -1,3 +1,7 @@
+// Re-export authentication functions from auth.tsx
+export { useAuth, withAuth, AuthProvider } from './auth'
+
+// Utility functions for authentication
 import { db, type User } from "./db"
 
 export interface AuthSession {
