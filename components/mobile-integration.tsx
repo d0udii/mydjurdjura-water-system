@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   Settings,
   User,
+  Users,
   Package,
   ShoppingCart,
   BarChart3,
