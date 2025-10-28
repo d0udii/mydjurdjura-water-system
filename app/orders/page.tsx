@@ -34,8 +34,7 @@ import {
   ShakeElement
 } from "@/components/animations"
 import { useDataStore } from "@/lib/shared-data-store"
-import { useAuth } from "@/lib/auth"
-import { withAuth } from "@/lib/auth"
+import { useAuth, withAuth } from "@/lib/auth"
 
 // Loading Spinner Component
 const LoadingSpinner = ({ text, subtext }: { text: string; subtext?: string }) => (
