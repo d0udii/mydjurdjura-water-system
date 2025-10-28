@@ -12,13 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useDataStore } from '@/lib/shared-data-store'
-
-// Mock auth hook for demo
-const useAuth = () => ({
-  user: { id: "demo-operations", role: "operations", name: "Operations Team" }
-})
-
-const withAuth = (Component: any) => Component
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
 
 interface PalletTracking {
   id: string
