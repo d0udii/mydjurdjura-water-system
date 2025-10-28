@@ -13,12 +13,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useDataStore } from "@/lib/shared-data-store"
 
-// Mock auth hook for demo
-const useAuth = () => ({
-  user: { id: "demo-operations", role: "operations", name: "Operations Team" }
-})
-
-const withAuth = (Component: any) => Component
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
 
 interface BLNumber {
   id: string
@@ -54,6 +50,8 @@ function BLNumbersPage() {
     order_id: "",
     notes: ""
   })
+  const [localBlNumbers, setLocalBlNumbers] = useState<BLNumber[]>([])
+  const [localOrders, setLocalOrders] = useState<Order[]>([])
 
   // Demo data
   const demoBLNumbers: BLNumber[] = [
@@ -119,23 +117,23 @@ function BLNumbersPage() {
       const ordersResponse = await fetch('/api/orders')
       if (ordersResponse.ok) {
         const ordersData = await ordersResponse.json()
-        setOrders(ordersData.orders || [])
+        setLocalOrders(ordersData.orders || [])
       }
       
       // Fetch BL numbers from API
       const blResponse = await fetch('/api/bl-numbers')
       if (blResponse.ok) {
         const blData = await blResponse.json()
-        setBlNumbers(blData.blNumbers || [])
+        setLocalBlNumbers(blData.blNumbers || [])
       } else {
         // Fallback to demo data if API doesn't exist yet
-        setBlNumbers(demoBLNumbers)
+        setLocalBlNumbers(demoBLNumbers)
       }
     } catch (error) {
       console.error('Error fetching data:', error)
       // Fallback to demo data
-      setBlNumbers(demoBLNumbers)
-      setOrders(demoOrders)
+      setLocalBlNumbers(demoBLNumbers)
+      setLocalOrders(demoOrders)
     } finally {
       setLoading(false)
     }
@@ -164,7 +162,8 @@ function BLNumbersPage() {
 
         if (response.ok) {
           const data = await response.json()
-          // Add to shared data store for real-time updates
+          // Add to local state and shared data store for real-time updates
+          setLocalBlNumbers(prev => [data.blNumber, ...prev])
           addBLNumber(data.blNumber)
           setIsCreateOpen(false)
           resetForm()
@@ -218,7 +217,7 @@ function BLNumbersPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setBlNumbers(prev => prev.map(bl => 
+        setLocalBlNumbers(prev => prev.map(bl => 
           bl.id === selectedBL.id ? data.blNumber : bl
         ))
         setIsEditOpen(false)
@@ -242,7 +241,7 @@ function BLNumbersPage() {
       })
 
       if (response.ok) {
-        setBlNumbers(prev => prev.filter(bl => bl.id !== blId))
+        setLocalBlNumbers(prev => prev.filter(bl => bl.id !== blId))
         alert("BL number deleted successfully!")
       } else {
         const error = await response.json()
@@ -254,7 +253,7 @@ function BLNumbersPage() {
     }
   }
 
-  const filteredBLNumbers = blNumbers.filter(bl => {
+  const filteredBLNumbers = localBlNumbers.filter(bl => {
     const matchesSearch = bl.bl_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          bl.order_id.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = filterStatus === "all" || bl.status === filterStatus
@@ -328,7 +327,7 @@ function BLNumbersPage() {
                         required
                       >
                         <option value="">Select an order...</option>
-                        {orders.filter(order => !blNumbers.some(bl => bl.order_id === order.id)).map((order) => (
+                        {localOrders.filter(order => !localBlNumbers.some(bl => bl.order_id === order.id)).map((order) => (
                           <option key={order.id} value={order.id}>
                             {order.id} - {order.clients?.name} ({order.clients?.address})
                           </option>
@@ -441,7 +440,7 @@ function BLNumbersPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredBLNumbers.map((blNumber) => {
-                    const order = orders.find(o => o.id === blNumber.order_id)
+                    const order = localOrders.find(o => o.id === blNumber.order_id)
                     return (
                       <TableRow key={blNumber.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                         <TableCell>
