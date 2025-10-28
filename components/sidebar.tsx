@@ -242,7 +242,7 @@ export function Sidebar() {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
-                <RevealOnScroll key={item.href} direction="left" delay={0.1 * index}>
+                <RevealOnScroll key={`${item.href}-${index}`} direction="left" delay={0.1 * index}>
                   <Link href={item.href}>
                     <Button
                       variant={isActive ? "default" : "ghost"}
