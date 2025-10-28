@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
+import { useToast } from "@/hooks/use-toast"
 
 interface UserPresence {
   id: string
@@ -55,10 +56,12 @@ interface RealTimeCollaborationProps {
 
 export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ className }) => {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([])
   const [activeSessions, setActiveSessions] = useState<CollaborationSession[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [isConnected, setIsConnected] = useState(false)
+  const [activeFeatures, setActiveFeatures] = useState<Set<string>>(new Set())
   const wsRef = useRef<WebSocket | null>(null)
 
   const connectWebSocket = () => {
@@ -256,6 +259,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const startLiveChat = () => {
     console.log('Starting live chat')
+    setActiveFeatures(prev => new Set([...prev, 'live-chat']))
+    
+    toast({
+      title: "Live Chat Started",
+      description: "Live chat session has been initiated successfully",
+      duration: 3000,
+    })
+    
     const newNotification = {
       id: `notif-${Date.now()}`,
       title: 'Live Chat Started',
@@ -268,6 +279,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const startSharedEditing = () => {
     console.log('Starting shared editing')
+    setActiveFeatures(prev => new Set([...prev, 'shared-editing']))
+    
+    toast({
+      title: "Shared Editing Started",
+      description: "Shared editing session has been initiated successfully",
+      duration: 3000,
+    })
+    
     const newNotification = {
       id: `notif-${Date.now()}`,
       title: 'Shared Editing Started',
@@ -280,6 +299,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const startScreenShare = () => {
     console.log('Starting screen share')
+    setActiveFeatures(prev => new Set([...prev, 'screen-share']))
+    
+    toast({
+      title: "Screen Share Started",
+      description: "Screen sharing session has been initiated successfully",
+      duration: 3000,
+    })
+    
     const newNotification = {
       id: `notif-${Date.now()}`,
       title: 'Screen Share Started',
@@ -304,6 +331,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const manageNotifications = () => {
     console.log('Managing notifications')
+    setActiveFeatures(prev => new Set([...prev, 'notifications']))
+    
+    toast({
+      title: "Notifications Managed",
+      description: "All notifications have been marked as read",
+      duration: 3000,
+    })
+    
     // Mark all notifications as read
     setNotifications(prev => 
       prev.map(notif => ({ ...notif, is_read: true }))
@@ -312,6 +347,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const viewActivityFeed = () => {
     console.log('Viewing activity feed')
+    setActiveFeatures(prev => new Set([...prev, 'activity-feed']))
+    
+    toast({
+      title: "Activity Feed Opened",
+      description: "Activity feed is now visible",
+      duration: 3000,
+    })
+    
     const newNotification = {
       id: `notif-${Date.now()}`,
       title: 'Activity Feed Opened',
@@ -324,6 +367,14 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
 
   const managePermissions = () => {
     console.log('Managing permissions')
+    setActiveFeatures(prev => new Set([...prev, 'permissions']))
+    
+    toast({
+      title: "Permissions Opened",
+      description: "Permission management panel is now open",
+      duration: 3000,
+    })
+    
     const newNotification = {
       id: `notif-${Date.now()}`,
       title: 'Permissions Opened',
@@ -636,29 +687,59 @@ export const RealTimeCollaboration: React.FC<RealTimeCollaborationProps> = ({ cl
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startLiveChat}>
+            <Button 
+              variant={activeFeatures.has('live-chat') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('live-chat') ? 'bg-green-600 hover:bg-green-700' : ''}`} 
+              onClick={startLiveChat}
+            >
               <MessageCircle className="h-6 w-6" />
               <span className="text-sm">Live Chat</span>
+              {activeFeatures.has('live-chat') && <Badge className="bg-green-100 text-green-800 text-xs">Active</Badge>}
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startSharedEditing}>
+            <Button 
+              variant={activeFeatures.has('shared-editing') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('shared-editing') ? 'bg-blue-600 hover:bg-blue-700' : ''}`} 
+              onClick={startSharedEditing}
+            >
               <Edit className="h-6 w-6" />
               <span className="text-sm">Shared Editing</span>
+              {activeFeatures.has('shared-editing') && <Badge className="bg-blue-100 text-blue-800 text-xs">Active</Badge>}
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={startScreenShare}>
+            <Button 
+              variant={activeFeatures.has('screen-share') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('screen-share') ? 'bg-purple-600 hover:bg-purple-700' : ''}`} 
+              onClick={startScreenShare}
+            >
               <Eye className="h-6 w-6" />
               <span className="text-sm">Screen Share</span>
+              {activeFeatures.has('screen-share') && <Badge className="bg-purple-100 text-purple-800 text-xs">Active</Badge>}
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={manageNotifications}>
+            <Button 
+              variant={activeFeatures.has('notifications') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('notifications') ? 'bg-orange-600 hover:bg-orange-700' : ''}`} 
+              onClick={manageNotifications}
+            >
               <Bell className="h-6 w-6" />
               <span className="text-sm">Notifications</span>
+              {activeFeatures.has('notifications') && <Badge className="bg-orange-100 text-orange-800 text-xs">Active</Badge>}
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={viewActivityFeed}>
+            <Button 
+              variant={activeFeatures.has('activity-feed') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('activity-feed') ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`} 
+              onClick={viewActivityFeed}
+            >
               <Activity className="h-6 w-6" />
               <span className="text-sm">Activity Feed</span>
+              {activeFeatures.has('activity-feed') && <Badge className="bg-yellow-100 text-yellow-800 text-xs">Active</Badge>}
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={managePermissions}>
+            <Button 
+              variant={activeFeatures.has('permissions') ? "default" : "outline"} 
+              className={`h-20 flex flex-col gap-2 ${activeFeatures.has('permissions') ? 'bg-red-600 hover:bg-red-700' : ''}`} 
+              onClick={managePermissions}
+            >
               <Lock className="h-6 w-6" />
               <span className="text-sm">Permissions</span>
+              {activeFeatures.has('permissions') && <Badge className="bg-red-100 text-red-800 text-xs">Active</Badge>}
             </Button>
           </div>
         </CardContent>
