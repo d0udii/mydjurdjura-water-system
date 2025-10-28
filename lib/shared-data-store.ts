@@ -13,11 +13,19 @@ class DataStore {
   private listeners: Set<Function> = new Set()
 
   constructor() {
-    this.loadInitialData()
+    // Don't load data immediately during static generation
+    if (typeof window !== 'undefined') {
+      this.loadInitialData()
+    }
   }
 
   private async loadInitialData() {
     try {
+      // Only load data if we're in a browser environment
+      if (typeof window === 'undefined') {
+        return
+      }
+
       // Load orders
       const ordersResponse = await fetch('/api/orders')
       if (ordersResponse.ok) {
