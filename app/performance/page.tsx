@@ -42,13 +42,8 @@ import {
   useCache,
   useRealtimeNotifications
 } from "@/hooks/realtime"
-
-// Mock auth hook for demo
-const useAuth = () => ({
-  user: { id: "demo-admin", role: "admin", name: "Admin" }
-})
-
-const withAuth = (Component: any) => Component
+import { useAuth } from "@/lib/auth"
+import { withAuth } from "@/lib/auth"
 
 function PerformancePage() {
   const { user } = useAuth()
