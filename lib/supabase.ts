@@ -35,7 +35,11 @@ if (supabaseUrl && supabaseUrl !== 'https://demo.supabase.co') {
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
     },
     from: () => ({
-      select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }),
+      select: () => ({ 
+        eq: () => Promise.resolve({ data: [], error: null }),
+        order: () => Promise.resolve({ data: [], error: null }),
+        single: () => Promise.resolve({ data: null, error: null })
+      }),
       insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
       update: () => ({ eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }) }),
       delete: () => ({ eq: () => Promise.resolve({ error: null }) })

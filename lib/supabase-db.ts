@@ -204,15 +204,31 @@ export async function getRegions(): Promise<Region[]> {
 
 export async function getClients(): Promise<Client[]> {
   try {
-    const { data, error } = await supabase
+    if (!supabase) {
+      console.error('Supabase client not initialized')
+      return []
+    }
+
+    const query = supabase
       .from('clients')
       .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-    return data || []
+    
+    if (query && typeof query.order === 'function') {
+      const { data, error } = await query.order('created_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    } else {
+      // Fallback if order doesn't exist
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []).sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+    }
   } catch (error) {
     console.error('Error fetching clients:', error)
+    logSupabaseError(error, 'READ', 'clients')
+    handleReadError('clients', error)
     return []
   }
 }
