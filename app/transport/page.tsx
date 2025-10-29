@@ -59,7 +59,8 @@ function TransportPage() {
   const validateAddForm = (): boolean => {
     const validationRules = {
       city: FormValidator.rules.required('City'),
-      price: FormValidator.rules.positiveNumber('Delivery Price')
+      price: FormValidator.rules.positiveNumber('Delivery Price'),
+      region_id: FormValidator.rules.required('Region')
     }
     const result = FormValidator.validateForm(addForm, validationRules)
     setAddErrors(result.errors)
@@ -69,7 +70,8 @@ function TransportPage() {
   const validateEditForm = (): boolean => {
     const validationRules = {
       city: FormValidator.rules.required('City'),
-      price: FormValidator.rules.positiveNumber('Delivery Price')
+      price: FormValidator.rules.positiveNumber('Delivery Price'),
+      region_id: FormValidator.rules.required('Region')
     }
     const result = FormValidator.validateForm(editForm, validationRules)
     setEditErrors(result.errors)
@@ -351,11 +353,12 @@ function TransportPage() {
             <FormSelect
               label="Region"
               name="add-region_id"
+              required
               error={addErrors.region_id}
               value={addForm.region_id}
               onValueChange={(value: string) => setAddForm({ ...addForm, region_id: value })}
               options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
-              placeholder="Select region (optional)"
+              placeholder="Select region"
             />
             <FormActions>
               <FormButton 
@@ -425,11 +428,12 @@ function TransportPage() {
             <FormSelect
               label="Region"
               name="region_id"
+              required
               error={editErrors.region_id}
               value={editForm.region_id}
               onValueChange={(value: string) => setEditForm({ ...editForm, region_id: value })}
               options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
-              placeholder="Select region (optional)"
+              placeholder="Select region"
             />
             <FormActions>
               <FormButton 
