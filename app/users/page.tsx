@@ -13,7 +13,9 @@ import { Crown, Shield, Zap, Lock, Edit, Trash2, UserPlus, CheckCircle, XCircle 
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
-import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
+import { useUsers, useUpdateUser, useDeleteUser } from "@/lib/supabase-realtime-hooks"
+import { FormInput, FormSelect, FormButton, FormLayout, FormActions } from "@/components/ui/form-components"
+import { FormValidator } from "@/lib/form-validation"
 
 interface User {
   id: string
@@ -26,8 +28,10 @@ interface User {
 
 function UsersPage() {
   const { user } = useAuth()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: users = [], isLoading: loading, error } = useUsers()
+  const updateUser = useUpdateUser()
+  const deleteUser = useDeleteUser()
+  
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [editForm, setEditForm] = useState({
@@ -36,26 +40,19 @@ function UsersPage() {
     role: 'supervisor' as 'admin' | 'regional_manager' | 'supervisor' | 'operations',
     status: 'active' as 'active' | 'inactive' | 'pending'
   })
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   
   // Admin permissions
   const isUserAdmin = user?.role === "admin"
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      const response = await fetch('/api/users')
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users || [])
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error)
-    } finally {
-      setLoading(false)
+  const validateEditForm = (): boolean => {
+    const validationRules = {
+      name: FormValidator.rules.required('Name'),
+      email: FormValidator.rules.email('Email')
     }
+    const result = FormValidator.validateForm(editForm, validationRules)
+    setEditErrors(result.errors)
+    return result.isValid
   }
 
   const handleEditUser = (userToEdit: User) => {
@@ -72,106 +69,29 @@ function UsersPage() {
   const handleUpdateUser = async () => {
     if (!selectedUser) return
 
-    // Validation
-    if (!editForm.name.trim()) {
-      showEditErrorToast('User', 'Name is required')
-      return
-    }
-    if (!editForm.email.trim()) {
-      showEditErrorToast('User', 'Email is required')
+    if (!validateEditForm()) {
       return
     }
 
     try {
-      const oldValues = {
-        name: selectedUser.name,
-        email: selectedUser.email,
-        role: selectedUser.role,
-        status: selectedUser.status
-      }
-
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
+      await updateUser.mutateAsync({
+        id: selectedUser.id,
+        updates: editForm
       })
-
-      if (response.ok) {
-        // Update local state
-        setUsers(users.map(u => 
-          u.id === selectedUser.id 
-            ? { ...u, ...editForm }
-            : u
-        ))
-        
-        showEditSuccessToast('User', editForm.name)
-        
-        // Log activity
-        await logEditActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'User',
-          selectedUser.id,
-          editForm.name,
-          oldValues,
-          editForm
-        )
-        
-        setIsEditDialogOpen(false)
-        setSelectedUser(null)
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('User', errorData.error || 'Failed to update user')
-      }
+      
+      setIsEditDialogOpen(false)
+      setSelectedUser(null)
+      setEditErrors({})
     } catch (error) {
       console.error('Error updating user:', error)
-      showEditErrorToast('User', 'Network error occurred')
     }
   }
 
   const handleDeleteUser = async (userId: string) => {
-    const userToDelete = users.find(u => u.id === userId)
-    if (!userToDelete) {
-      showEditErrorToast('User', 'User not found')
-      return
-    }
-
     try {
-      const oldValues = {
-        name: userToDelete.name,
-        email: userToDelete.email,
-        role: userToDelete.role,
-        status: userToDelete.status
-      }
-
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        // Update local state
-        setUsers(users.filter(u => u.id !== userId))
-        
-        showDeleteSuccessToast('User', userToDelete.name)
-        
-        // Log activity
-        await logDeleteActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'User',
-          userId,
-          userToDelete.name,
-          oldValues
-        )
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('User', errorData.error || 'Failed to delete user')
-      }
+      await deleteUser.mutateAsync(userId)
     } catch (error) {
       console.error('Error deleting user:', error)
-      showEditErrorToast('User', 'Network error occurred')
     }
   }
 
@@ -344,62 +264,70 @@ function UsersPage() {
               Edit User
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="Enter user name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                placeholder="Enter user email"
-              />
-            </div>
-            <div>
-              <Label htmlFor="role">Role</Label>
-              <Select value={editForm.role} onValueChange={(value: 'admin' | 'regional_manager' | 'supervisor' | 'operations') => setEditForm({ ...editForm, role: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="regional_manager">Regional Manager</SelectItem>
-                  <SelectItem value="supervisor">Supervisor</SelectItem>
-                  <SelectItem value="operations">Operations</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={editForm.status} onValueChange={(value: 'active' | 'inactive' | 'pending') => setEditForm({ ...editForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <FormLayout onSubmit={(e) => { e.preventDefault(); handleUpdateUser(); }}>
+            <FormInput
+              label="Name"
+              name="name"
+              required
+              error={editErrors.name}
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              placeholder="Enter user name"
+            />
+            <FormInput
+              label="Email"
+              name="email"
+              type="email"
+              required
+              error={editErrors.email}
+              value={editForm.email}
+              onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+              placeholder="Enter user email"
+            />
+            <FormSelect
+              label="Role"
+              name="role"
+              value={editForm.role}
+              onValueChange={(value: 'admin' | 'regional_manager' | 'supervisor' | 'operations') => setEditForm({ ...editForm, role: value })}
+              options={[
+                { value: 'admin', label: 'Admin' },
+                { value: 'regional_manager', label: 'Regional Manager' },
+                { value: 'supervisor', label: 'Supervisor' },
+                { value: 'operations', label: 'Operations' }
+              ]}
+              placeholder="Select role"
+            />
+            <FormSelect
+              label="Status"
+              name="status"
+              value={editForm.status}
+              onValueChange={(value: 'active' | 'inactive' | 'pending') => setEditForm({ ...editForm, status: value })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'pending', label: 'Pending' }
+              ]}
+              placeholder="Select status"
+            />
+            <FormActions>
+              <FormButton 
+                variant="outline" 
+                onClick={() => {
+                  setIsEditDialogOpen(false)
+                  setEditErrors({})
+                }}
+              >
                 Cancel
-              </Button>
-              <Button onClick={handleUpdateUser} className="bg-blue-600 hover:bg-blue-700">
+              </FormButton>
+              <FormButton 
+                onClick={handleUpdateUser}
+                loading={updateUser.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
                 Update User
-              </Button>
-            </div>
-          </div>
+              </FormButton>
+            </FormActions>
+          </FormLayout>
         </DialogContent>
       </Dialog>
     </div>

@@ -13,7 +13,9 @@ import { Crown, Shield, Zap, Lock, Package, Edit, Trash2, Plus, CheckCircle, XCi
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
-import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/lib/supabase-realtime-hooks"
+import { FormInput, FormSelect, FormButton, FormLayout, FormActions } from "@/components/ui/form-components"
+import { FormValidator } from "@/lib/form-validation"
 
 interface Product {
   id: string
@@ -27,10 +29,22 @@ interface Product {
 
 function ProductsPage() {
   const { user } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: products = [], isLoading: loading, error } = useProducts()
+  const createProduct = useCreateProduct()
+  const updateProduct = useUpdateProduct()
+  const deleteProduct = useDeleteProduct()
+  
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    volume: '',
+    units_per_pallet: 0,
+    unit_price: 0,
+    status: 'active' as 'active' | 'inactive' | 'discontinued'
+  })
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({})
   const [editForm, setEditForm] = useState({
     name: '',
     volume: '',
@@ -38,25 +52,55 @@ function ProductsPage() {
     unit_price: 0,
     status: 'active' as 'active' | 'inactive' | 'discontinued'
   })
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   
   // Admin permissions
   const isUserAdmin = user?.role === "admin"
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  const validateCreateForm = (): boolean => {
+    const validationRules = {
+      name: FormValidator.rules.required('Product Name'),
+      volume: FormValidator.rules.required('Volume'),
+      units_per_pallet: FormValidator.rules.positiveNumber('Units per Pallet'),
+      unit_price: FormValidator.rules.positiveNumber('Unit Price')
+    }
 
-  const fetchData = async () => {
+    const result = FormValidator.validateForm(createForm, validationRules)
+    setCreateErrors(result.errors)
+    return result.isValid
+  }
+
+  const validateEditForm = (): boolean => {
+    const validationRules = {
+      name: FormValidator.rules.required('Product Name'),
+      volume: FormValidator.rules.required('Volume'),
+      units_per_pallet: FormValidator.rules.positiveNumber('Units per Pallet'),
+      unit_price: FormValidator.rules.positiveNumber('Unit Price')
+    }
+
+    const result = FormValidator.validateForm(editForm, validationRules)
+    setEditErrors(result.errors)
+    return result.isValid
+  }
+
+  const handleCreateProduct = async () => {
+    if (!validateCreateForm()) {
+      return
+    }
+
     try {
-      const response = await fetch('/api/products')
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data.products || [])
-      }
+      await createProduct.mutateAsync(createForm)
+      setIsCreateDialogOpen(false)
+      setCreateForm({
+        name: '',
+        volume: '',
+        units_per_pallet: 0,
+        unit_price: 0,
+        status: 'active'
+      })
+      setCreateErrors({})
     } catch (error) {
-      console.error('Error fetching products:', error)
-    } finally {
-      setLoading(false)
+      console.error('Error creating product:', error)
     }
   }
 
@@ -75,71 +119,21 @@ function ProductsPage() {
   const handleUpdateProduct = async () => {
     if (!selectedProduct) return
 
-    // Validation
-    if (!editForm.name.trim()) {
-      showEditErrorToast('Product', 'Name is required')
-      return
-    }
-    if (!editForm.volume.trim()) {
-      showEditErrorToast('Product', 'Volume is required')
-      return
-    }
-    if (editForm.units_per_pallet <= 0) {
-      showEditErrorToast('Product', 'Units per pallet must be greater than 0')
-      return
-    }
-    if (editForm.unit_price <= 0) {
-      showEditErrorToast('Product', 'Unit price must be greater than 0')
+    if (!validateEditForm()) {
       return
     }
 
     try {
-      const oldValues = {
-        name: selectedProduct.name,
-        volume: selectedProduct.volume,
-        units_per_pallet: selectedProduct.units_per_pallet,
-        unit_price: selectedProduct.unit_price,
-        status: selectedProduct.status
-      }
-
-      const response = await fetch(`/api/products/${selectedProduct.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
+      await updateProduct.mutateAsync({
+        id: selectedProduct.id,
+        updates: editForm
       })
-
-      if (response.ok) {
-        // Update local state
-        setProducts(products.map(p => 
-          p.id === selectedProduct.id 
-            ? { ...p, ...editForm }
-            : p
-        ))
-        
-        showEditSuccessToast('Product', editForm.name)
-        
-        // Log activity
-        await logEditActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'Product',
-          selectedProduct.id,
-          editForm.name,
-          oldValues,
-          editForm
-        )
-        
-        setIsEditDialogOpen(false)
-        setSelectedProduct(null)
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('Product', errorData.error || 'Failed to update product')
-      }
+      
+      setIsEditDialogOpen(false)
+      setSelectedProduct(null)
+      setEditErrors({})
     } catch (error) {
       console.error('Error updating product:', error)
-      showEditErrorToast('Product', 'Network error occurred')
     }
   }
 
@@ -151,40 +145,9 @@ function ProductsPage() {
     }
 
     try {
-      const oldValues = {
-        name: productToDelete.name,
-        volume: productToDelete.volume,
-        units_per_pallet: productToDelete.units_per_pallet,
-        unit_price: productToDelete.unit_price,
-        status: productToDelete.status
-      }
-
-      const response = await fetch(`/api/products/${productId}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        // Update local state
-        setProducts(products.filter(p => p.id !== productId))
-        
-        showDeleteSuccessToast('Product', productToDelete.name)
-        
-        // Log activity
-        await logDeleteActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'Product',
-          productId,
-          productToDelete.name,
-          oldValues
-        )
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('Product', errorData.error || 'Failed to delete product')
-      }
+      await deleteProduct.mutateAsync(productId)
     } catch (error) {
       console.error('Error deleting product:', error)
-      showEditErrorToast('Product', 'Network error occurred')
     }
   }
 
@@ -241,7 +204,11 @@ function ProductsPage() {
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button className={`w-full sm:w-auto ${user?.role === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}>
+            <Button 
+              onClick={() => setIsCreateDialogOpen(true)}
+              className={`w-full sm:w-auto ${user?.role === 'admin' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}
+            >
+              <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
           </div>
@@ -339,6 +306,86 @@ function ProductsPage() {
         </CardContent>
       </Card>
 
+      {/* Create Product Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Product</DialogTitle>
+          </DialogHeader>
+          <FormLayout onSubmit={(e) => { e.preventDefault(); handleCreateProduct(); }}>
+            <FormInput
+              label="Product Name"
+              name="create_name"
+              required
+              error={createErrors.name}
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              placeholder="Enter product name"
+            />
+            <FormInput
+              label="Volume"
+              name="create_volume"
+              required
+              error={createErrors.volume}
+              value={createForm.volume}
+              onChange={(e) => setCreateForm({ ...createForm, volume: e.target.value })}
+              placeholder="e.g., 5.5L, 1.5L"
+            />
+            <FormInput
+              label="Units per Pallet"
+              name="create_units_per_pallet"
+              type="number"
+              required
+              error={createErrors.units_per_pallet}
+              value={createForm.units_per_pallet}
+              onChange={(e) => setCreateForm({ ...createForm, units_per_pallet: parseInt(e.target.value) || 0 })}
+              placeholder="Enter units per pallet"
+            />
+            <FormInput
+              label="Unit Price (DA)"
+              name="create_unit_price"
+              type="number"
+              step="0.01"
+              required
+              error={createErrors.unit_price}
+              value={createForm.unit_price}
+              onChange={(e) => setCreateForm({ ...createForm, unit_price: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter unit price"
+            />
+            <FormSelect
+              label="Status"
+              name="create_status"
+              value={createForm.status}
+              onValueChange={(value: 'active' | 'inactive' | 'discontinued') => setCreateForm({ ...createForm, status: value })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'discontinued', label: 'Discontinued' }
+              ]}
+              placeholder="Select status"
+            />
+            <FormActions>
+              <FormButton 
+                variant="outline" 
+                onClick={() => {
+                  setIsCreateDialogOpen(false)
+                  setCreateErrors({})
+                }}
+              >
+                Cancel
+              </FormButton>
+              <FormButton 
+                onClick={handleCreateProduct}
+                loading={createProduct.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Create Product
+              </FormButton>
+            </FormActions>
+          </FormLayout>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Product Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -348,67 +395,77 @@ function ProductsPage() {
               Edit Product
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Product Name</Label>
-              <Input
-                id="name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="Enter product name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="volume">Volume</Label>
-              <Input
-                id="volume"
-                value={editForm.volume}
-                onChange={(e) => setEditForm({ ...editForm, volume: e.target.value })}
-                placeholder="e.g., 5.5L, 1.5L"
-              />
-            </div>
-            <div>
-              <Label htmlFor="units_per_pallet">Units per Pallet</Label>
-              <Input
-                id="units_per_pallet"
-                type="number"
-                value={editForm.units_per_pallet}
-                onChange={(e) => setEditForm({ ...editForm, units_per_pallet: parseInt(e.target.value) || 0 })}
-                placeholder="Enter units per pallet"
-              />
-            </div>
-            <div>
-              <Label htmlFor="unit_price">Unit Price (DA)</Label>
-              <Input
-                id="unit_price"
-                type="number"
-                value={editForm.unit_price}
-                onChange={(e) => setEditForm({ ...editForm, unit_price: parseFloat(e.target.value) || 0 })}
-                placeholder="Enter unit price"
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={editForm.status} onValueChange={(value: 'active' | 'inactive' | 'discontinued') => setEditForm({ ...editForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="discontinued">Discontinued</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <FormLayout onSubmit={(e) => { e.preventDefault(); handleUpdateProduct(); }}>
+            <FormInput
+              label="Product Name"
+              name="name"
+              required
+              error={editErrors.name}
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              placeholder="Enter product name"
+            />
+            <FormInput
+              label="Volume"
+              name="volume"
+              required
+              error={editErrors.volume}
+              value={editForm.volume}
+              onChange={(e) => setEditForm({ ...editForm, volume: e.target.value })}
+              placeholder="e.g., 5.5L, 1.5L"
+            />
+            <FormInput
+              label="Units per Pallet"
+              name="units_per_pallet"
+              type="number"
+              required
+              error={editErrors.units_per_pallet}
+              value={editForm.units_per_pallet}
+              onChange={(e) => setEditForm({ ...editForm, units_per_pallet: parseInt(e.target.value) || 0 })}
+              placeholder="Enter units per pallet"
+            />
+            <FormInput
+              label="Unit Price (DA)"
+              name="unit_price"
+              type="number"
+              step="0.01"
+              required
+              error={editErrors.unit_price}
+              value={editForm.unit_price}
+              onChange={(e) => setEditForm({ ...editForm, unit_price: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter unit price"
+            />
+            <FormSelect
+              label="Status"
+              name="status"
+              value={editForm.status}
+              onValueChange={(value: 'active' | 'inactive' | 'discontinued') => setEditForm({ ...editForm, status: value })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'discontinued', label: 'Discontinued' }
+              ]}
+              placeholder="Select status"
+            />
+            <FormActions>
+              <FormButton 
+                variant="outline" 
+                onClick={() => {
+                  setIsEditDialogOpen(false)
+                  setEditErrors({})
+                }}
+              >
                 Cancel
-              </Button>
-              <Button onClick={handleUpdateProduct} className="bg-blue-600 hover:bg-blue-700">
+              </FormButton>
+              <FormButton 
+                onClick={handleUpdateProduct}
+                loading={updateProduct.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
                 Update Product
-              </Button>
-            </div>
-          </div>
+              </FormButton>
+            </FormActions>
+          </FormLayout>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,182 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sharedOrders, addOrder, getAllOrders } from '@/lib/shared-api-data'
-import { getTariffByCity } from '@/lib/transport'
-
-// Helper function to calculate promotion discount
-function calculatePromotionDiscount(order: any, promotions: any[]): number {
-  const clientCity = order.clients?.address?.split(',')[1]?.trim()
-  const clientId = order.client_id
-  
-  // Find applicable promotions
-  const applicablePromotions = promotions.filter(promo => {
-    if (promo.status !== 'active') return false
-    if (new Date() < new Date(promo.start_date) || new Date() > new Date(promo.end_date)) return false
-    
-    return (
-      promo.target_type === 'city' && promo.target_id === clientCity ||
-      promo.target_type === 'client' && promo.target_id === clientId ||
-      promo.target_type === 'supervisor' && promo.target_id === order.created_by
-    )
-  })
-  
-  if (applicablePromotions.length === 0) return 0
-  
-  // Use the highest discount promotion
-  const bestPromotion = applicablePromotions.reduce((best, current) => {
-    const bestDiscount = best.type === 'percentage' ? 
-      (order.total_price * best.value / 100) : best.value
-    const currentDiscount = current.type === 'percentage' ? 
-      (order.total_price * current.value / 100) : current.value
-    
-    return currentDiscount > bestDiscount ? current : best
-  })
-  
-  return bestPromotion.type === 'percentage' ? 
-    (order.total_price * bestPromotion.value / 100) : bestPromotion.value
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    let orderData
-    try {
-      orderData = await request.json()
-    } catch (jsonError) {
-      return NextResponse.json(
-        { error: 'Invalid JSON format' },
-        { status: 400 }
-      )
-    }
-    
-    // Validation
-    if (!orderData.client_id || orderData.client_id.trim() === '') {
-      return NextResponse.json(
-        { error: 'Client ID is required' },
-        { status: 400 }
-      )
-    }
-    
-    if (!orderData.product_5_5L_pallets && !orderData.product_1_5L_pallets) {
-      return NextResponse.json(
-        { error: 'At least one product quantity is required' },
-        { status: 400 }
-      )
-    }
-    
-    if (orderData.product_5_5L_pallets < 0 || orderData.product_1_5L_pallets < 0) {
-      return NextResponse.json(
-        { error: 'Product quantities cannot be negative' },
-        { status: 400 }
-      )
-    }
-    
-    if (!['factory', 'client_own'].includes(orderData.truck_type)) {
-      return NextResponse.json(
-        { error: 'Invalid truck type' },
-        { status: 400 }
-      )
-    }
-    
-    // Generate new order ID
-    const newOrderId = `ORD-${Date.now()}`
-    
-    // Calculate total price if not provided
-    let totalPrice = orderData.total_price
-    if (!totalPrice || totalPrice === 0) {
-      // Calculate product costs
-      const product5_5LPrice = (orderData.product_5_5L_pallets || 0) * 212 * 65 // 212 bottles per pallet × 65 DA
-      const product1_5LPrice = (orderData.product_1_5L_pallets || 0) * 112 * 178.5 // 112 bottles per pallet × 178.5 DA
-      const productTotal = product5_5LPrice + product1_5LPrice
-      
-      // Calculate transport cost using dynamic tariffs
-      let transportCost = 0
-      if (orderData.truck_type === "factory") {
-        // Get client city from the order data
-        const clientCity = orderData.clients?.address?.split(',')[1]?.trim() || 
-                          orderData.client_city || 
-                          'Biskra' // Default fallback
-        
-        // Get tariff for the city
-        const tariff = getTariffByCity(clientCity)
-        if (tariff && tariff.status === 'active') {
-          // Calculate transport cost based on total pallets
-          const totalPallets = (orderData.product_5_5L_pallets || 0) + (orderData.product_1_5L_pallets || 0)
-          transportCost = totalPallets * tariff.cost_per_pallet
-        } else {
-          // Fallback to region-based calculation if tariff not found
-          transportCost = orderData.region_id === "REG-001" ? 31000 : 
-                         orderData.region_id === "REG-002" ? 30000 :
-                         orderData.region_id === "REG-003" ? 47000 :
-                         orderData.region_id === "REG-004" ? 42000 : 35000
-        }
-      }
-      
-      totalPrice = productTotal + transportCost
-    }
-    
-    // Create new order with proper structure
-    const newOrder = {
-      id: newOrderId,
-      client_id: orderData.client_id,
-      region_id: orderData.region_id,
-      assigned_to: orderData.assigned_to || "USR-004", // Operations team
-      status: "pending",
-      total_price: totalPrice,
-      product_5_5L_pallets: orderData.product_5_5L_pallets,
-      product_1_5L_pallets: orderData.product_1_5L_pallets,
-      truck_type: orderData.truck_type,
-      truck_capacity: orderData.truck_capacity,
-      delivery_date: orderData.delivery_date,
-      notes: orderData.notes || "",
-      bl_number: null,
-      approved_by: null,
-      approved_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      created_by: orderData.created_by || 'unknown',
-      // Include related data for immediate display
-      clients: {
-        id: orderData.client_id,
-        name: orderData.clients?.name || 'Unknown Client',
-        phone: orderData.clients?.phone || '',
-        address: orderData.clients?.address || '',
-        region_id: orderData.region_id
-      },
-      regions: {
-        id: orderData.region_id,
-        name: orderData.regions?.name || 'Unknown Region',
-        responsible: orderData.regions?.responsible || 'Unknown Manager'
-      }
-    }
-    
-    // Add to shared orders array (persistent across server restarts)
-    addOrder(newOrder)
-    
-    // Create automatic notifications (simplified for now)
-    const notifications = {
-      type: 'order_created',
-      title: 'New Order Created',
-      message: `Order ${newOrder.id} has been created`,
-      recipient_id: orderData.created_by || 'unknown',
-      order_id: newOrder.id
-    }
-    
-    return NextResponse.json({
-      message: 'Order created successfully',
-      order: newOrder,
-      notifications: notifications
-    }, { status: 201 })
-    
-  } catch (error) {
-    console.error('Error creating order:', error)
-    return NextResponse.json(
-      { error: 'Failed to create order' },
-      { status: 500 }
-    )
-  }
-}
+import { getOrders, createOrder, getClients, getRegions } from '@/lib/supabase-db'
+import { initializeDatabase } from '@/lib/supabase-db'
 
 export async function GET(request: NextRequest) {
   try {
+    await initializeDatabase()
     const { searchParams } = new URL(request.url)
     const userRole = searchParams.get('user_role')
     const userId = searchParams.get('user_id')
@@ -184,8 +12,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const assignedTo = searchParams.get('assigned_to')
     
-    // Use shared orders data
-    let filteredOrders = [...getAllOrders()]
+    let orders = await getOrders()
     
     // Filter based on user role and permissions
     if (userRole === 'operations') {
@@ -193,40 +20,98 @@ export async function GET(request: NextRequest) {
       // No additional filtering needed
     } else if (userRole === 'supervisor') {
       // Supervisors can only see orders they created or are assigned to
-      filteredOrders = filteredOrders.filter(order => 
-        order.created_by === userId || order.assigned_to === userId
+      orders = orders.filter(order => 
+        order.assigned_to === userId
       )
     } else if (userRole === 'regional_manager') {
       // Regional managers can see orders in their region
       if (regionId) {
-        filteredOrders = filteredOrders.filter(order => order.region_id === regionId)
+        orders = orders.filter(order => order.region_id === regionId)
       }
     }
     
     // Apply additional filters
     if (status) {
-      filteredOrders = filteredOrders.filter(order => order.status === status)
+      orders = orders.filter(order => order.status === status)
     }
     
     if (assignedTo) {
-      filteredOrders = filteredOrders.filter(order => order.assigned_to === assignedTo)
+      orders = orders.filter(order => order.assigned_to === assignedTo)
     }
     
     // Sort by creation date (newest first)
-    filteredOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     
     return NextResponse.json({ 
-      orders: filteredOrders,
+      orders: orders,
       stats: {
-        totalOrders: filteredOrders.length,
-        pendingOrders: filteredOrders.filter(o => o.status === 'pending').length,
-        inProgressOrders: filteredOrders.filter(o => o.status === 'in_progress').length,
-        deliveredOrders: filteredOrders.filter(o => o.status === 'delivered').length,
-        totalRevenue: filteredOrders.reduce((sum, o) => sum + o.total_price, 0)
+        totalOrders: orders.length,
+        pendingOrders: orders.filter(o => o.status === 'pending').length,
+        inProgressOrders: orders.filter(o => o.status === 'in_progress').length,
+        deliveredOrders: orders.filter(o => o.status === 'delivered').length,
+        totalRevenue: orders.reduce((sum, o) => sum + o.total_price, 0)
       }
     })
   } catch (error) {
     console.error('Error fetching orders:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    await initializeDatabase()
+    const data = await request.json()
+    const {
+      client_id,
+      region_id,
+      assigned_to,
+      total_price,
+      product_5_5L_pallets,
+      product_1_5L_pallets,
+      truck_type,
+      truck_capacity,
+      delivery_date,
+      notes
+    } = data
+
+    if (!client_id || !region_id || !total_price) {
+      return NextResponse.json(
+        { error: 'Client, region, and total price are required' },
+        { status: 400 }
+      )
+    }
+
+    const newOrder = await createOrder({
+      client_id,
+      region_id,
+      assigned_to: assigned_to || null,
+      status: 'pending',
+      total_price: parseFloat(total_price),
+      product_5_5L_pallets: product_5_5L_pallets || 0,
+      product_1_5L_pallets: product_1_5L_pallets || 0,
+      truck_type: truck_type || 'factory',
+      truck_capacity: truck_capacity || 22,
+      delivery_date: delivery_date || null,
+      notes: notes || ''
+    })
+
+    if (!newOrder) {
+      return NextResponse.json(
+        { error: 'Failed to create order' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(
+      { 
+        message: 'Order created successfully',
+        order: newOrder 
+      },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('Error creating order:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

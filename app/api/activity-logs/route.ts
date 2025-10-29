@@ -1,68 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getActivityLogs, createActivityLog } from '@/lib/supabase-db'
+import { initializeDatabase } from '@/lib/supabase-db'
 
-// In-memory storage for activity logs (replace with database in production)
-let activityLogs: any[] = []
+export async function GET(request: NextRequest) {
+  try {
+    await initializeDatabase()
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('user_id')
+    const actionType = searchParams.get('action_type')
+    const affectedTable = searchParams.get('affected_table')
+    
+    let activityLogs = await getActivityLogs()
+    
+    if (userId) {
+      activityLogs = activityLogs.filter(log => log.user_id === userId)
+    }
+    
+    if (actionType) {
+      activityLogs = activityLogs.filter(log => log.action_type === actionType)
+    }
+    
+    if (affectedTable) {
+      activityLogs = activityLogs.filter(log => log.affected_table === affectedTable)
+    }
+    
+    return NextResponse.json({ activityLogs })
+  } catch (error) {
+    console.error('Error fetching activity logs:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    await initializeDatabase()
     const logEntry = await request.json()
     
-    // Add timestamp if not provided
-    if (!logEntry.timestamp) {
-      logEntry.timestamp = new Date().toISOString()
+    // Validate required fields
+    if (!logEntry.user_id || !logEntry.action_type || !logEntry.details || !logEntry.affected_table) {
+      return NextResponse.json(
+        { error: 'Missing required fields: user_id, action_type, details, affected_table' },
+        { status: 400 }
+      )
     }
     
-    // Add to logs
-    activityLogs.push(logEntry)
+    const activityLog = await createActivityLog({
+      user_id: logEntry.user_id,
+      action_type: logEntry.action_type,
+      details: logEntry.details,
+      affected_table: logEntry.affected_table,
+      affected_record_id: logEntry.affected_record_id || null
+    })
     
-    // Keep only last 1000 logs to prevent memory issues
-    if (activityLogs.length > 1000) {
-      activityLogs = activityLogs.slice(-1000)
+    if (!activityLog) {
+      return NextResponse.json(
+        { error: 'Failed to create activity log' },
+        { status: 500 }
+      )
     }
     
     return NextResponse.json({ 
       success: true, 
       message: 'Activity logged successfully',
-      logId: logEntry.id
+      logId: activityLog.id
     })
   } catch (error) {
     console.error('Error logging activity:', error)
     return NextResponse.json({ error: 'Failed to log activity' }, { status: 500 })
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('user_id')
-    const entityType = searchParams.get('entity_type')
-    const limit = parseInt(searchParams.get('limit') || '100')
-    
-    let filteredLogs = activityLogs
-    
-    // Filter by user if specified
-    if (userId) {
-      filteredLogs = filteredLogs.filter(log => log.user_id === userId)
-    }
-    
-    // Filter by entity type if specified
-    if (entityType) {
-      filteredLogs = filteredLogs.filter(log => log.entity_type === entityType)
-    }
-    
-    // Sort by timestamp (newest first)
-    filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    
-    // Limit results
-    filteredLogs = filteredLogs.slice(0, limit)
-    
-    return NextResponse.json({ 
-      logs: filteredLogs,
-      total: activityLogs.length,
-      filtered: filteredLogs.length
-    })
-  } catch (error) {
-    console.error('Error fetching activity logs:', error)
-    return NextResponse.json({ error: 'Failed to fetch activity logs' }, { status: 500 })
   }
 }

@@ -1,254 +1,290 @@
 /**
- * Global Error Handling Utilities
- * Provides consistent error handling across all pages
+ * Error Handling and Logging System
+ * Provides comprehensive error handling, logging, and debugging for all CRUD operations
  */
 
-export interface ErrorInfo {
-  message: string
-  code?: string
-  details?: any
+export interface ErrorLog {
   timestamp: string
-  userAction?: string
+  operation: string
+  entity: string
+  error: any
+  context?: any
+  userId?: string
 }
 
-export class AppError extends Error {
-  public code: string
-  public details?: any
-  public userAction?: string
-
-  constructor(message: string, code: string = 'UNKNOWN_ERROR', details?: any, userAction?: string) {
-    super(message)
-    this.name = 'AppError'
-    this.code = code
-    this.details = details
-    this.userAction = userAction
-  }
+export interface ApiCallLog {
+  timestamp: string
+  method: string
+  endpoint: string
+  status: 'success' | 'error'
+  duration?: number
+  error?: any
+  userId?: string
 }
 
-export const ErrorCodes = {
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
-  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
-  NOT_FOUND_ERROR: 'NOT_FOUND_ERROR',
-  SERVER_ERROR: 'SERVER_ERROR',
-  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
-  DATA_CORRUPTION_ERROR: 'DATA_CORRUPTION_ERROR'
-} as const
+class ErrorLogger {
+  private logs: ErrorLog[] = []
+  private apiLogs: ApiCallLog[] = []
 
-export function createErrorInfo(error: any, userAction?: string): ErrorInfo {
-  return {
-    message: error.message || 'An unknown error occurred',
-    code: error.code || ErrorCodes.SERVER_ERROR,
-    details: error.details || null,
+  // Log errors with context
+  logError(operation: string, entity: string, error: any, context?: any, userId?: string) {
+    const errorLog: ErrorLog = {
     timestamp: new Date().toISOString(),
-    userAction
-  }
-}
-
-export function handleApiError(response: Response, userAction?: string): AppError {
-  if (response.status >= 500) {
-    return new AppError(
-      'Server error occurred. Please try again later.',
-      ErrorCodes.SERVER_ERROR,
-      { status: response.status },
-      userAction
-    )
-  }
-  
-  if (response.status === 404) {
-    return new AppError(
-      'Resource not found.',
-      ErrorCodes.NOT_FOUND_ERROR,
-      { status: response.status },
-      userAction
-    )
-  }
-  
-  if (response.status === 401) {
-    return new AppError(
-      'Authentication required. Please log in.',
-      ErrorCodes.AUTHENTICATION_ERROR,
-      { status: response.status },
-      userAction
-    )
-  }
-  
-  if (response.status === 403) {
-    return new AppError(
-      'Access denied. You do not have permission to perform this action.',
-      ErrorCodes.AUTHORIZATION_ERROR,
-      { status: response.status },
-      userAction
-    )
-  }
-  
-  if (response.status >= 400) {
-    return new AppError(
-      'Request failed. Please check your input and try again.',
-      ErrorCodes.VALIDATION_ERROR,
-      { status: response.status },
-      userAction
-    )
-  }
-  
-  return new AppError(
-    'An unexpected error occurred.',
-    ErrorCodes.SERVER_ERROR,
-    { status: response.status },
-    userAction
-  )
-}
-
-export async function safeApiCall<T>(
-  apiCall: () => Promise<Response>,
-  userAction?: string
-): Promise<{ data?: T; error?: AppError }> {
-  try {
-    const response = await apiCall()
-    
-    if (!response.ok) {
-      const error = handleApiError(response, userAction)
-      return { error }
+      operation,
+      entity,
+      error: this.sanitizeError(error),
+      context,
+      userId
     }
+
+    this.logs.push(errorLog)
     
-    const data = await response.json()
-    return { data }
-  } catch (error) {
-    if (error instanceof AppError) {
-      return { error }
-    }
-    
-    // Network or other errors
-    const appError = new AppError(
-      'Network error. Please check your connection and try again.',
-      ErrorCodes.NETWORK_ERROR,
-      error,
-      userAction
-    )
-    
-    return { error: appError }
-  }
-}
+    // Console logging for debugging
+    console.group(`🚨 ERROR: ${operation} ${entity}`)
+    console.error('Error:', error)
+    console.error('Context:', context)
+    console.error('Timestamp:', errorLog.timestamp)
+    console.error('User ID:', userId)
+    console.groupEnd()
 
-export function showErrorToast(error: AppError) {
-  // This would integrate with your toast notification system
-  console.error('Error:', error.message, error.details)
-  
-  // You can customize this based on error type
-  switch (error.code) {
-    case ErrorCodes.NETWORK_ERROR:
-      return 'Network error. Please check your connection.'
-    case ErrorCodes.AUTHENTICATION_ERROR:
-      return 'Please log in to continue.'
-    case ErrorCodes.AUTHORIZATION_ERROR:
-      return 'You do not have permission to perform this action.'
-    case ErrorCodes.VALIDATION_ERROR:
-      return 'Please check your input and try again.'
-    case ErrorCodes.NOT_FOUND_ERROR:
-      return 'The requested resource was not found.'
-    case ErrorCodes.SERVER_ERROR:
-      return 'Server error. Please try again later.'
-    default:
-      return error.message || 'An unexpected error occurred.'
-  }
-}
-
-export function logError(error: AppError, context?: string) {
-  const errorInfo = createErrorInfo(error, context)
-  
-  // Log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Error logged:', errorInfo)
-  }
-  
-  // In production, you might want to send this to an error tracking service
-  // like Sentry, LogRocket, etc.
-  
-  return errorInfo
-}
-
-export function validateRequiredFields(data: any, requiredFields: string[]): string[] {
-  const missingFields = requiredFields.filter(field => {
-    const value = data[field]
-    return !value || (typeof value === 'string' && value.trim() === '')
-  })
-  
-  return missingFields
-}
-
-export function validateEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-export function validatePhone(phone: string): boolean {
-  const phoneRegex = /^[\+]?[0-9\s\-\(\)]+$/
-  return phoneRegex.test(phone)
-}
-
-export function validatePositiveNumber(value: any): boolean {
-  return typeof value === 'number' && value > 0
-}
-
-export function validateNonNegativeNumber(value: any): boolean {
-  return typeof value === 'number' && value >= 0
-}
-
-export function sanitizeInput(input: string): string {
-  return input.trim().replace(/[<>]/g, '')
-}
-
-export function createRetryableApiCall<T>(
-  apiCall: () => Promise<T>,
-  maxRetries: number = 3,
-  delay: number = 1000
-): Promise<T> {
-  return new Promise(async (resolve, reject) => {
-    let lastError: any
-    
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Store in localStorage for debugging (development only)
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       try {
-        const result = await apiCall()
-        resolve(result)
-        return
-      } catch (error) {
-        lastError = error
-        
-        if (attempt < maxRetries) {
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)))
+        const existingLogs = JSON.parse(localStorage.getItem('error-logs') || '[]')
+        existingLogs.push(errorLog)
+        // Keep only last 100 logs
+        if (existingLogs.length > 100) {
+          existingLogs.splice(0, existingLogs.length - 100)
         }
+        localStorage.setItem('error-logs', JSON.stringify(existingLogs))
+      } catch (e) {
+        console.warn('Failed to store error log in localStorage:', e)
+      }
+    }
+  }
+
+  // Log API calls
+  logApiCall(method: string, endpoint: string, status: 'success' | 'error', duration?: number, error?: any, userId?: string) {
+    const apiLog: ApiCallLog = {
+      timestamp: new Date().toISOString(),
+      method,
+      endpoint,
+      status,
+      duration,
+      error: error ? this.sanitizeError(error) : undefined,
+      userId
+    }
+
+    this.apiLogs.push(apiLog)
+
+    if (status === 'error') {
+      console.group(`🌐 API ERROR: ${method} ${endpoint}`)
+      console.error('Error:', error)
+      console.error('Duration:', duration)
+      console.error('Timestamp:', apiLog.timestamp)
+      console.error('User ID:', userId)
+      console.groupEnd()
+    } else {
+      console.log(`🌐 API SUCCESS: ${method} ${endpoint} (${duration}ms)`)
+    }
+
+    // Store in localStorage for debugging (development only)
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      try {
+        const existingLogs = JSON.parse(localStorage.getItem('api-logs') || '[]')
+        existingLogs.push(apiLog)
+        // Keep only last 200 logs
+        if (existingLogs.length > 200) {
+          existingLogs.splice(0, existingLogs.length - 200)
+        }
+        localStorage.setItem('api-logs', JSON.stringify(existingLogs))
+      } catch (e) {
+        console.warn('Failed to store API log in localStorage:', e)
+      }
+    }
+  }
+
+  // Sanitize error objects for logging
+  private sanitizeError(error: any): any {
+    if (error instanceof Error) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
       }
     }
     
-    reject(lastError)
+    if (typeof error === 'object' && error !== null) {
+      // Remove sensitive data
+      const sanitized = { ...error }
+      delete sanitized.password
+      delete sanitized.token
+      delete sanitized.key
+      delete sanitized.secret
+      return sanitized
+    }
+    
+    return error
+  }
+
+  // Get error logs
+  getErrorLogs(): ErrorLog[] {
+    return [...this.logs]
+  }
+
+  // Get API logs
+  getApiLogs(): ApiCallLog[] {
+    return [...this.apiLogs]
+  }
+
+  // Clear logs
+  clearLogs() {
+    this.logs = []
+    this.apiLogs = []
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('error-logs')
+      localStorage.removeItem('api-logs')
+    }
+  }
+
+  // Export logs for debugging
+  exportLogs() {
+    return {
+      errorLogs: this.logs,
+      apiLogs: this.apiLogs,
+      exportedAt: new Date().toISOString()
+    }
+  }
+}
+
+// Global error logger instance
+export const errorLogger = new ErrorLogger()
+
+// Utility functions for common error patterns
+export const logSupabaseError = (operation: string, entity: string, error: any, context?: any, userId?: string) => {
+  errorLogger.logError(operation, entity, error, context, userId)
+}
+
+export const logApiError = (method: string, endpoint: string, error: any, duration?: number, userId?: string) => {
+  errorLogger.logApiCall(method, endpoint, 'error', duration, error, userId)
+}
+
+export const logApiSuccess = (method: string, endpoint: string, duration?: number, userId?: string) => {
+  errorLogger.logApiCall(method, endpoint, 'success', duration, userId)
+}
+
+// Error handling wrapper for async operations
+export const withErrorHandling = async <T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  entity: string,
+  userId?: string
+): Promise<T | null> => {
+  try {
+    const result = await operation()
+    return result
+  } catch (error) {
+    logSupabaseError(operationName, entity, error, undefined, userId)
+    return null
+  }
+}
+
+// API call wrapper with logging
+export const withApiLogging = async <T>(
+  apiCall: () => Promise<T>,
+  method: string,
+  endpoint: string,
+  userId?: string
+): Promise<T | null> => {
+  const startTime = Date.now()
+  
+  try {
+    const result = await apiCall()
+    const duration = Date.now() - startTime
+    logApiSuccess(method, endpoint, duration, userId)
+    return result
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logApiError(method, endpoint, error, duration, userId)
+    return null
+  }
+}
+
+// Specific error handlers for different operations
+export const handleCreateError = (entity: string, error: any, context?: any, userId?: string) => {
+  logSupabaseError('CREATE', entity, error, context, userId)
+}
+
+export const handleReadError = (entity: string, error: any, context?: any, userId?: string) => {
+  logSupabaseError('READ', entity, error, context, userId)
+}
+
+export const handleUpdateError = (entity: string, error: any, context?: any, userId?: string) => {
+  logSupabaseError('UPDATE', entity, error, context, userId)
+}
+
+export const handleDeleteError = (entity: string, error: any, context?: any, userId?: string) => {
+  logSupabaseError('DELETE', entity, error, context, userId)
+}
+
+// Promise rejection handler
+export const handlePromiseRejection = (reason: any, promise: Promise<any>) => {
+  console.group('🚨 UNHANDLED PROMISE REJECTION')
+  console.error('Reason:', reason)
+  console.error('Promise:', promise)
+  console.error('Timestamp:', new Date().toISOString())
+  console.groupEnd()
+  
+  // Log to error logger
+  errorLogger.logError('PROMISE_REJECTION', 'UNKNOWN', reason, { promise })
+}
+
+// Global error handler
+export const handleGlobalError = (event: ErrorEvent) => {
+  console.group('🚨 GLOBAL ERROR')
+  console.error('Message:', event.message)
+  console.error('Filename:', event.filename)
+  console.error('Line:', event.lineno)
+  console.error('Column:', event.colno)
+  console.error('Error:', event.error)
+  console.error('Timestamp:', new Date().toISOString())
+  console.groupEnd()
+  
+  // Log to error logger
+  errorLogger.logError('GLOBAL_ERROR', 'APPLICATION', event.error, {
+    message: event.message,
+    filename: event.filename,
+    line: event.lineno,
+    column: event.colno
   })
 }
 
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout
-  
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func(...args), wait)
+// Initialize global error handlers
+export const initializeErrorHandlers = () => {
+  if (typeof window !== 'undefined') {
+    // Handle unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      handlePromiseRejection(event.reason, event.promise)
+    })
+
+    // Handle global errors
+    window.addEventListener('error', handleGlobalError)
   }
 }
 
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle: boolean
-  
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      func(...args)
-      inThrottle = true
-      setTimeout(() => inThrottle = false, limit)
-    }
+// Debug utilities
+export const getDebugInfo = () => {
+  return {
+    errorLogs: errorLogger.getErrorLogs(),
+    apiLogs: errorLogger.getApiLogs(),
+    localStorage: typeof window !== 'undefined' ? {
+      errorLogs: JSON.parse(localStorage.getItem('error-logs') || '[]'),
+      apiLogs: JSON.parse(localStorage.getItem('api-logs') || '[]')
+    } : null
   }
+}
+
+export const clearDebugLogs = () => {
+  errorLogger.clearLogs()
+  console.log('🧹 Debug logs cleared')
 }

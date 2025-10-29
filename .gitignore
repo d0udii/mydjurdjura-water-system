@@ -18,6 +18,7 @@ yarn-error.log*
 
 # env files
 .env*
+.env.local
 
 # vercel
 .vercel
@@ -25,4 +26,35 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.vercel
+
+# Test files
+test-*.js
+test-*.ts
+*-test.js
+*-test.ts
+*-comprehensive-test.js
+*-comprehensive-test.ts
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Logs
+logs/
+*.log
+api-error-log.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Lock files (keep package-lock.json, but ignore pnpm if using npm)
+# pnpm-lock.yaml

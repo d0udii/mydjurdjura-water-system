@@ -11,7 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDataStore } from "@/lib/shared-data-store"
+import { useDataStore } from "@/lib/supabase-data-store"
+import { showBLNumberSuccessToast, showBLNumberErrorToast, showLoadingToast, dismissToast } from "@/lib/toast-notifications"
+import { logSupabaseError } from "@/lib/error-handling"
+import { useBLNumbers, useCreateBLNumber, useUpdateBLNumber } from "@/lib/supabase-realtime-hooks"
 import { FileText, Edit, Trash2, Plus, Search, Filter } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
@@ -27,21 +30,12 @@ interface BLNumber {
   notes: string
 }
 
-interface Order {
-  id: string
-  client_id: string
-  status: string
-  total_price: number
-  clients?: {
-    name: string
-    address: string
-  }
-}
-
 function BLNumbersPage() {
   const { user } = useAuth()
-  const { orders, blNumbers, addBLNumber, updateBLNumber, refreshData } = useDataStore()
-  const [loading, setLoading] = useState(true)
+  const { data: blNumbers = [], isLoading: loading, error } = useBLNumbers()
+  const createBLNumber = useCreateBLNumber()
+  const updateBLNumber = useUpdateBLNumber()
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [selectedBL, setSelectedBL] = useState<BLNumber | null>(null)
@@ -51,133 +45,6 @@ function BLNumbersPage() {
     order_id: "",
     notes: ""
   })
-  const [localBlNumbers, setLocalBlNumbers] = useState<BLNumber[]>([])
-  const [localOrders, setLocalOrders] = useState<Order[]>([])
-
-  // Demo data
-  const demoBLNumbers: BLNumber[] = [
-    {
-      id: "BL-001",
-      order_id: "ORD-001",
-      bl_number: "BL2024001",
-      created_at: "2024-01-01T00:00:00Z",
-      created_by: "USR-004",
-      status: "active",
-      notes: "Initial BL number"
-    },
-    {
-      id: "BL-002",
-      order_id: "ORD-002",
-      bl_number: "BL2024002",
-      created_at: "2024-01-02T00:00:00Z",
-      created_by: "USR-004",
-      status: "active",
-      notes: "Standard delivery"
-    }
-  ]
-
-  const demoOrders: Order[] = [
-    {
-      id: "ORD-001",
-      client_id: "CLI-001",
-      status: "pending",
-      total_price: 125000,
-      clients: {
-        name: "Biskra Water Distributor",
-        address: "123 Main Street, Biskra"
-      }
-    },
-    {
-      id: "ORD-002",
-      client_id: "CLI-002",
-      status: "in_progress",
-      total_price: 89000,
-      clients: {
-        name: "Ouled Djellal Store",
-        address: "456 Market Square, Ouled Djellal"
-      }
-    }
-  ]
-
-  useEffect(() => {
-    fetchData()
-    
-    // Set up real-time updates every 5 seconds
-    const interval = setInterval(() => {
-      fetchData()
-    }, 5000)
-    
-    return () => clearInterval(interval)
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch orders from API
-      const ordersResponse = await fetch('/api/orders')
-      if (ordersResponse.ok) {
-        const ordersData = await ordersResponse.json()
-        setLocalOrders(ordersData.orders || [])
-      }
-      
-      // Fetch BL numbers from API
-      const blResponse = await fetch('/api/bl-numbers')
-      if (blResponse.ok) {
-        const blData = await blResponse.json()
-        setLocalBlNumbers(blData.blNumbers || [])
-      } else {
-        // Fallback to demo data if API doesn't exist yet
-        setLocalBlNumbers(demoBLNumbers)
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      // Fallback to demo data
-      setLocalBlNumbers(demoBLNumbers)
-      setLocalOrders(demoOrders)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCreateBL = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.order_id) {
-      alert("Please select an order")
-      return
-    }
-
-    try {
-      const response = await fetch('/api/bl-numbers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: formData.order_id,
-          notes: formData.notes,
-          created_by: user.id
-        })
-      })
-
-        if (response.ok) {
-          const data = await response.json()
-          // Add to local state and shared data store for real-time updates
-          setLocalBlNumbers(prev => [data.blNumber, ...prev])
-          addBLNumber(data.blNumber)
-          setIsCreateOpen(false)
-          resetForm()
-          alert(data.message)
-        } else {
-          const error = await response.json()
-          alert(error.error || 'Failed to create BL number')
-        }
-    } catch (error) {
-      console.error("Failed to create BL number:", error)
-      alert('Failed to create BL number')
-    }
-  }
 
   const resetForm = () => {
     setFormData({
@@ -186,11 +53,40 @@ function BLNumbersPage() {
     })
   }
 
-  const handleEdit = (blNumber: BLNumber) => {
-    setSelectedBL(blNumber)
+  const handleCreateBL = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.order_id.trim()) {
+      showBLNumberErrorToast('create', new Error('Please select an order'))
+      return
+    }
+
+    const loadingToastId = showLoadingToast('Creating BL number...')
+
+    try {
+      const blData = {
+        order_id: formData.order_id,
+        bl_number: `BL-${Date.now()}`,
+        notes: formData.notes,
+        created_by: user?.id || 'unknown'
+      }
+
+      await createBLNumber.mutateAsync(blData)
+      setIsCreateOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error('Error creating BL number:', error)
+      logSupabaseError('CREATE', 'BL Number', error, { formData })
+    } finally {
+      dismissToast(loadingToastId)
+    }
+  }
+
+  const handleEditBL = (bl: BLNumber) => {
+    setSelectedBL(bl)
     setFormData({
-      order_id: blNumber.order_id,
-      notes: blNumber.notes
+      order_id: bl.order_id,
+      notes: bl.notes
     })
     setIsEditOpen(true)
   }
@@ -198,428 +94,218 @@ function BLNumbersPage() {
   const handleUpdateBL = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!selectedBL) {
-      alert("No BL number selected for update")
-      return
-    }
+    if (!selectedBL) return
+
+    const loadingToastId = showLoadingToast('Updating BL number...')
 
     try {
-      const response = await fetch('/api/bl-numbers', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: selectedBL.id,
-          notes: formData.notes,
-          status: selectedBL.status
-        })
+      await updateBLNumber.mutateAsync({
+        id: selectedBL.id,
+        updates: { notes: formData.notes }
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        setLocalBlNumbers(prev => prev.map(bl => 
-          bl.id === selectedBL.id ? data.blNumber : bl
-        ))
-        setIsEditOpen(false)
-        setSelectedBL(null)
-        resetForm()
-        alert(data.message)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to update BL number')
-      }
+      
+      setIsEditOpen(false)
+      setSelectedBL(null)
+      resetForm()
     } catch (error) {
-      console.error("Failed to update BL number:", error)
-      alert('Failed to update BL number')
+      console.error('Error updating BL number:', error)
+      logSupabaseError('UPDATE', 'BL Number', error, { selectedBL, formData })
+    } finally {
+      dismissToast(loadingToastId)
     }
   }
 
-  const handleDelete = async (blId: string) => {
-    try {
-      const response = await fetch(`/api/bl-numbers?id=${blId}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        setLocalBlNumbers(prev => prev.filter(bl => bl.id !== blId))
-        alert("BL number deleted successfully!")
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to delete BL number')
-      }
-    } catch (error) {
-      console.error("Failed to delete BL number:", error)
-      alert('Failed to delete BL number')
-    }
-  }
-
-  const filteredBLNumbers = localBlNumbers.filter(bl => {
+  // Filter BL numbers based on search and status
+  const filteredBLNumbers = blNumbers.filter(bl => {
     const matchesSearch = bl.bl_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          bl.order_id.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = filterStatus === "all" || bl.status === filterStatus
     return matchesSearch && matchesStatus
   })
 
-  const canManageBL = user?.role === "admin" || user?.role === "operations"
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading BL Numbers...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        {/* Enhanced Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                  BL Numbers Management
-                </h1>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
-                Manage Bill of Lading numbers for all orders with unique tracking
-              </p>
-            </div>
-            
-            {canManageBL && (
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    size="lg"
-                    className="w-full lg:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                    onClick={resetForm}
-                  >
-                    <Plus className="mr-2 h-5 w-5" />
-                    Add BL Number
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                        <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      Add New BL Number
-                    </DialogTitle>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      Create a unique BL number for an order. The system will automatically generate a unique identifier.
-                    </p>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateBL} className="space-y-6 pt-4">
-                    <div>
-                      <Label htmlFor="order_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Order <span className="text-red-500">*</span>
-                      </Label>
-                      <select
-                        id="order_id"
-                        value={formData.order_id}
-                        onChange={(e) => setFormData({ ...formData, order_id: e.target.value })}
-                        className="w-full h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      >
-                        <option value="">Select an order...</option>
-                        {localOrders.filter(order => !localBlNumbers.some(bl => bl.order_id === order.id)).map((order) => (
-                          <option key={order.id} value={order.id}>
-                            {order.id} - {order.clients?.name} ({order.clients?.address})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">BL Numbers Management</h1>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create BL Number
+        </Button>
+      </div>
 
-                    <div>
-                      <Label htmlFor="notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Additional notes about this BL number..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateOpen(false)}
-                        className="px-6"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="px-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Create BL Number
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+      {/* Search and Filter */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex gap-4">
             <div className="flex-1">
+              <Label htmlFor="search">Search</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by BL number or Order ID..."
+                  id="search"
+                  placeholder="Search by BL number or order ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12"
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-              <Button variant="outline" size="sm" className="h-12 px-4">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <div className="w-48">
+              <Label htmlFor="status">Status</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <Filter className="w-4 h-4 mr-2" />
+                    {filterStatus === "all" ? "All Statuses" : filterStatus}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setFilterStatus("all")}>
+                    All Statuses
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("active")}>
+                    Active
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("inactive")}>
+                    Inactive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("cancelled")}>
+                    Cancelled
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Enhanced BL Numbers Table */}
-        <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-t-xl">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                  <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-bold">BL Numbers ({filteredBLNumbers.length})</CardTitle>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Manage and track all Bill of Lading numbers</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
+      {/* BL Numbers Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            BL Numbers ({filteredBLNumbers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>BL Number</TableHead>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredBLNumbers.map((bl) => (
+                <TableRow key={bl.id}>
+                  <TableCell className="font-medium">{bl.bl_number}</TableCell>
+                  <TableCell>{bl.order_id}</TableCell>
+                  <TableCell>
+                    <Badge variant={bl.status === "active" ? "default" : "secondary"}>
+                      {bl.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(bl.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate">{bl.notes}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditBL(bl)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          {filteredBLNumbers.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No BL numbers found
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 dark:bg-gray-700">
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">BL Number</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Order ID</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Client</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Created</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Notes</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBLNumbers.map((blNumber) => {
-                    const order = localOrders.find(o => o.id === blNumber.order_id)
-                    return (
-                      <TableRow key={blNumber.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-white">
-                                {blNumber.bl_number.slice(-3)}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900 dark:text-white">{blNumber.bl_number}</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">ID: {blNumber.id}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium text-gray-900 dark:text-white">{blNumber.order_id}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900 dark:text-white">{order?.clients?.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{order?.clients?.address}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={blNumber.status === "active" ? "default" : "secondary"}
-                            className={
-                              blNumber.status === "active" 
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                                : blNumber.status === "inactive"
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            }
-                          >
-                            {blNumber.status.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-gray-500">
-                            {new Date(blNumber.created_at).toLocaleDateString()}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-gray-600 dark:text-gray-400 max-w-[200px] truncate">
-                            {blNumber.notes || "No notes"}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {canManageBL && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEdit(blNumber)}
-                                  className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete BL Number</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete BL number {blNumber.bl_number}? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(blNumber.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Package className="mr-2 h-4 w-4" />
-                                  View Order Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Export PDF
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create BL Number Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New BL Number</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateBL} className="space-y-4">
+            <div>
+              <Label htmlFor="order_id">Order ID</Label>
+              <Input
+                id="order_id"
+                value={formData.order_id}
+                onChange={(e) => setFormData({ ...formData, order_id: e.target.value })}
+                placeholder="Enter order ID"
+                required
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create BL Number</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-        {/* Edit BL Number Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                  <Edit className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                Edit BL Number
-              </DialogTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                Update the BL number details and notes.
-              </p>
-            </DialogHeader>
-            <form onSubmit={handleUpdateBL} className="space-y-6 pt-4">
-              <div>
-                <Label htmlFor="edit_bl_number" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  BL Number
-                </Label>
-                <Input
-                  id="edit_bl_number"
-                  value={selectedBL?.bl_number || ""}
-                  disabled
-                  className="bg-gray-50 dark:bg-gray-700"
-                />
-                <p className="text-xs text-gray-500 mt-1">BL number cannot be changed</p>
-              </div>
-
-              <div>
-                <Label htmlFor="edit_notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">Notes</Label>
-                <Textarea
-                  id="edit_notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Additional notes about this BL number..."
-                  className="min-h-[100px]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditOpen(false)}
-                  className="px-6"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="px-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Update BL Number
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+      {/* Edit BL Number Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit BL Number</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateBL} className="space-y-4">
+            <div>
+              <Label htmlFor="edit_notes">Notes</Label>
+              <Textarea
+                id="edit_notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update BL Number</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -110,6 +110,18 @@ CREATE TABLE activity_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create bl_numbers table
+CREATE TABLE bl_numbers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    order_id UUID NOT NULL REFERENCES orders(id),
+    bl_number VARCHAR(50) NOT NULL UNIQUE,
+    created_by UUID NOT NULL REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
@@ -137,6 +149,7 @@ CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON clients FOR EACH ROW E
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_transport_tariffs_updated_at BEFORE UPDATE ON transport_tariffs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_bl_numbers_updated_at BEFORE UPDATE ON bl_numbers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert initial data
 INSERT INTO regions (id, name, description) VALUES
@@ -185,13 +198,20 @@ ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transport_tariffs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bl_numbers ENABLE ROW LEVEL SECURITY;
 
--- Simplified policies to avoid recursion (for demo purposes)
+-- Simplified policies to allow all operations (for demo purposes)
+-- In production, you should implement proper role-based policies
 CREATE POLICY "Allow all operations for demo" ON users FOR ALL USING (true);
 CREATE POLICY "Allow all operations for demo" ON clients FOR ALL USING (true);
 CREATE POLICY "Allow all operations for demo" ON orders FOR ALL USING (true);
 CREATE POLICY "Allow all operations for demo" ON notifications FOR ALL USING (true);
 CREATE POLICY "Allow all operations for demo" ON activity_logs FOR ALL USING (true);
+CREATE POLICY "Allow all operations for demo" ON products FOR ALL USING (true);
+CREATE POLICY "Allow all operations for demo" ON transport_tariffs FOR ALL USING (true);
+CREATE POLICY "Allow all operations for demo" ON bl_numbers FOR ALL USING (true);
 
 -- Create a function to get user by email (for authentication)
 CREATE OR REPLACE FUNCTION get_user_by_email(user_email TEXT)

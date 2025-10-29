@@ -1,65 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllOrders } from '@/lib/shared-api-data'
-
-// Demo BL numbers data (in production, this would be in a database)
-let demoBLNumbers = [
-  {
-    id: "BL-001",
-    order_id: "ORD-002",
-    bl_number: "BL-2024-001",
-    created_at: "2024-01-08T15:30:00Z",
-    created_by: "USR-004",
-    status: "active",
-    notes: "BL number for Ouled Djellal Store order"
-  },
-  {
-    id: "BL-002",
-    order_id: "ORD-003",
-    bl_number: "BL-2024-002",
-    created_at: "2024-01-01T09:00:00Z",
-    created_by: "USR-004",
-    status: "active",
-    notes: "BL number for Oued Souf Market order"
-  }
-]
+import { getBLNumbers, createBLNumber, updateBLNumber, deleteBLNumber } from '@/lib/supabase-db'
+import { initializeDatabase } from '@/lib/supabase-db'
 
 export async function GET(request: NextRequest) {
   try {
+    await initializeDatabase()
     const { searchParams } = new URL(request.url)
     const orderId = searchParams.get('order_id')
     const status = searchParams.get('status')
     
-    // Get BL numbers from orders that have them
-    const ordersWithBL = getAllOrders().filter(order => order.bl_number)
-    const blNumbersFromOrders = ordersWithBL.map(order => ({
-      id: `BL-${order.id}`,
-      order_id: order.id,
-      bl_number: order.bl_number,
-      created_at: order.approved_at || order.created_at,
-      created_by: order.approved_by || 'USR-004',
-      status: order.status === 'delivered' ? 'inactive' : 'active',
-      notes: `Auto-generated BL number for order ${order.id}`
-    }))
-    
-    // Combine with existing BL numbers
-    let allBLNumbers = [...demoBLNumbers, ...blNumbersFromOrders]
-    
-    // Remove duplicates based on bl_number
-    const uniqueBLNumbers = allBLNumbers.filter((bl, index, self) => 
-      index === self.findIndex(b => b.bl_number === bl.bl_number)
-    )
-    
-    let filteredBLNumbers = uniqueBLNumbers
+    let blNumbers = await getBLNumbers()
     
     if (orderId) {
-      filteredBLNumbers = filteredBLNumbers.filter(bl => bl.order_id === orderId)
+      blNumbers = blNumbers.filter(bl => bl.order_id === orderId)
     }
     
     if (status) {
-      filteredBLNumbers = filteredBLNumbers.filter(bl => bl.status === status)
+      blNumbers = blNumbers.filter(bl => bl.status === status)
     }
     
-    return NextResponse.json({ blNumbers: filteredBLNumbers })
+    return NextResponse.json({ blNumbers })
   } catch (error) {
     console.error('Error fetching BL numbers:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -68,6 +28,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await initializeDatabase()
     const data = await request.json()
     const { order_id, bl_number, notes, created_by } = data
     
@@ -79,35 +40,20 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Check if BL number already exists
-    const existingBL = demoBLNumbers.find(bl => bl.bl_number === bl_number)
-    if (existingBL) {
-      return NextResponse.json(
-        { error: 'BL number already exists' },
-        { status: 400 }
-      )
-    }
-    
-    // Check if order already has a BL number
-    const existingOrderBL = demoBLNumbers.find(bl => bl.order_id === order_id)
-    if (existingOrderBL) {
-      return NextResponse.json(
-        { error: 'Order already has a BL number' },
-        { status: 400 }
-      )
-    }
-    
-    const newBLNumber = {
-      id: `BL-${String(Date.now()).slice(-6)}`,
+    const newBLNumber = await createBLNumber({
       order_id,
       bl_number,
-      created_at: new Date().toISOString(),
-      created_by: created_by || 'USR-004',
-      status: 'active' as const,
+      created_by: created_by || '550e8400-e29b-41d4-a716-446655440010', // Default admin user
+      status: 'active',
       notes: notes || ''
-    }
+    })
     
-    demoBLNumbers.push(newBLNumber)
+    if (!newBLNumber) {
+      return NextResponse.json(
+        { error: 'Failed to create BL number' },
+        { status: 500 }
+      )
+    }
     
     return NextResponse.json({ 
       blNumber: newBLNumber, 
@@ -121,38 +67,29 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await initializeDatabase()
     const data = await request.json()
     const { id, bl_number, notes, status } = data
     
-    const blIndex = demoBLNumbers.findIndex(bl => bl.id === id)
-    if (blIndex === -1) {
+    if (!id) {
+      return NextResponse.json(
+        { error: 'BL number ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    const updatedBLNumber = await updateBLNumber(id, {
+      bl_number,
+      notes,
+      status
+    })
+    
+    if (!updatedBLNumber) {
       return NextResponse.json(
         { error: 'BL number not found' },
         { status: 404 }
       )
     }
-    
-    // Check if new BL number already exists (if changing)
-    if (bl_number && bl_number !== demoBLNumbers[blIndex].bl_number) {
-      const existingBL = demoBLNumbers.find(bl => bl.bl_number === bl_number && bl.id !== id)
-      if (existingBL) {
-        return NextResponse.json(
-          { error: 'BL number already exists' },
-          { status: 400 }
-        )
-      }
-    }
-    
-    // Update BL number
-    const updatedBLNumber = {
-      ...demoBLNumbers[blIndex],
-      bl_number: bl_number || demoBLNumbers[blIndex].bl_number,
-      notes: notes || demoBLNumbers[blIndex].notes,
-      status: status || demoBLNumbers[blIndex].status,
-      updated_at: new Date().toISOString()
-    }
-    
-    demoBLNumbers[blIndex] = updatedBLNumber
     
     return NextResponse.json({ 
       blNumber: updatedBLNumber, 
@@ -166,6 +103,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await initializeDatabase()
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     
@@ -176,20 +114,17 @@ export async function DELETE(request: NextRequest) {
       )
     }
     
-    const blIndex = demoBLNumbers.findIndex(bl => bl.id === id)
-    if (blIndex === -1) {
+    const success = await deleteBLNumber(id)
+    
+    if (!success) {
       return NextResponse.json(
         { error: 'BL number not found' },
         { status: 404 }
       )
     }
     
-    const deletedBLNumber = demoBLNumbers[blIndex]
-    demoBLNumbers.splice(blIndex, 1)
-    
     return NextResponse.json({ 
-      message: "BL number deleted successfully",
-      blNumber: deletedBLNumber
+      message: "BL number deleted successfully"
     })
   } catch (error) {
     console.error('Error deleting BL number:', error)

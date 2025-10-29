@@ -1,4 +1,11 @@
 import { supabase } from '@/lib/supabase'
+import { 
+  logSupabaseError, 
+  handleCreateError, 
+  handleReadError, 
+  handleUpdateError, 
+  handleDeleteError 
+} from '@/lib/error-handling'
 
 // Database interfaces
 export interface User {
@@ -84,14 +91,15 @@ export interface Notification {
   created_at: string
 }
 
-export interface ActivityLog {
+export interface BLNumber {
   id: string
-  user_id: string
-  action_type: string
-  details: string
-  affected_table: string
-  affected_record_id?: string
+  order_id: string
+  bl_number: string
+  created_by: string
+  status: string
+  notes?: string
   created_at: string
+  updated_at: string
 }
 
 // Database functions using Supabase
@@ -102,26 +110,31 @@ export async function getUsers(): Promise<User[]> {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      handleReadError('Users', error)
+      throw error
+    }
+    
     return data || []
   } catch (error) {
+    logSupabaseError('READ', 'Users', error)
     console.error('Error fetching users:', error)
     return []
   }
 }
 
-export async function getUserById(id: string): Promise<User | null> {
+export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', id)
+      .eq('email', email)
       .single()
 
     if (error) throw error
     return data
   } catch (error) {
-    console.error('Error fetching user:', error)
+    console.error('Error fetching user by email:', error)
     return null
   }
 }
@@ -268,18 +281,67 @@ export async function deleteClient(id: string): Promise<boolean> {
   }
 }
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProductById(id: string): Promise<Product | null> {
   try {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('name')
+      .eq('id', id)
+      .single()
 
     if (error) throw error
-    return data || []
+    return data
   } catch (error) {
-    console.error('Error fetching products:', error)
-    return []
+    console.error('Error fetching product:', error)
+    return null
+  }
+}
+
+export async function createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product | null> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .insert([product])
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating product:', error)
+    return null
+  }
+}
+
+export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating product:', error)
+    return null
+  }
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Error deleting product:', error)
+    return false
   }
 }
 
@@ -295,6 +357,54 @@ export async function getTransportTariffs(): Promise<TransportTariff[]> {
   } catch (error) {
     console.error('Error fetching transport tariffs:', error)
     return []
+  }
+}
+
+export async function createTransportTariff(tariff: Omit<TransportTariff, 'id' | 'created_at' | 'updated_at'>): Promise<TransportTariff | null> {
+  try {
+    const { data, error } = await supabase
+      .from('transport_tariffs')
+      .insert([tariff])
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating transport tariff:', error)
+    return null
+  }
+}
+
+export async function updateTransportTariff(id: string, updates: Partial<TransportTariff>): Promise<TransportTariff | null> {
+  try {
+    const { data, error } = await supabase
+      .from('transport_tariffs')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating transport tariff:', error)
+    return null
+  }
+}
+
+export async function deleteTransportTariff(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('transport_tariffs')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Error deleting transport tariff:', error)
+    return false
   }
 }
 
@@ -495,23 +605,66 @@ export async function getTransportCostForRegion(regionId: string): Promise<numbe
   }
 }
 
-// Initialize database - this will be called when the app starts
-export async function initializeDatabase(): Promise<void> {
+// BL Numbers functions
+export async function getBLNumbers(): Promise<BLNumber[]> {
   try {
-    // Test database connection
     const { data, error } = await supabase
-      .from('users')
-      .select('count')
-      .limit(1)
+      .from('bl_numbers')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Database connection failed:', error)
-      throw new Error('Failed to connect to database')
-    }
-
-    console.log('✅ Database connected successfully')
+    if (error) throw error
+    return data || []
   } catch (error) {
-    console.error('❌ Database initialization failed:', error)
-    throw error
+    console.error('Error fetching BL numbers:', error)
+    return []
+  }
+}
+
+export async function createBLNumber(blNumber: Omit<BLNumber, 'id' | 'created_at' | 'updated_at'>): Promise<BLNumber | null> {
+  try {
+    const { data, error } = await supabase
+      .from('bl_numbers')
+      .insert([blNumber])
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating BL number:', error)
+    return null
+  }
+}
+
+export async function updateBLNumber(id: string, updates: Partial<BLNumber>): Promise<BLNumber | null> {
+  try {
+    const { data, error } = await supabase
+      .from('bl_numbers')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating BL number:', error)
+    return null
+  }
+}
+
+export async function deleteBLNumber(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('bl_numbers')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Error deleting BL number:', error)
+    return false
   }
 }

@@ -1,125 +1,148 @@
-import { NextRequest, NextResponse } from 'next/server'
-
-// Import demo data from the main clients API
-const demoClients = [
-  {
-    id: "CLI-001",
-    name: "Biskra Water Distributor",
-    phone: "+213 33 123 456",
-    address: "123 Main Street, Biskra",
-    region_id: "REG-001",
-    contact_person: "Ahmed Benali",
-    rc_number: "001234567RC",
-    status: "active",
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z"
-  },
-  {
-    id: "CLI-002",
-    name: "Ouled Djellal Store",
-    phone: "+213 33 789 012",
-    address: "456 Market Square, Ouled Djellal",
-    region_id: "REG-001",
-    contact_person: "Fatima Djellal",
-    rc_number: "002345678RC",
-    status: "active",
-    created_at: "2024-01-02T00:00:00Z",
-    updated_at: "2024-01-02T00:00:00Z"
-  },
-  {
-    id: "CLI-003",
-    name: "Oued Souf Market",
-    phone: "+213 33 456 789",
-    address: "789 Commercial Ave, Oued Souf",
-    region_id: "REG-001",
-    contact_person: "Omar Souf",
-    rc_number: "003456789RC",
-    status: "active",
-    created_at: "2024-01-03T00:00:00Z",
-    updated_at: "2024-01-03T00:00:00Z"
-  },
-  {
-    id: "CLI-004",
-    name: "El Mghair Shop",
-    phone: "+213 33 321 654",
-    address: "321 Business St, El Mghair",
-    region_id: "REG-001",
-    contact_person: "Amina Mghair",
-    rc_number: "004567890RC",
-    status: "active",
-    created_at: "2024-01-04T00:00:00Z",
-    updated_at: "2024-01-04T00:00:00Z"
-  },
-  {
-    id: "CLI-029",
-    name: "Samir Mennacer",
-    phone: "0540233149",
-    address: "Tolga, Biskra",
-    region_id: "REG-001",
-    contact_person: "Samir Mennacer",
-    rc_number: "123456789RC",
-    status: "active",
-    created_at: "2024-01-05T00:00:00Z",
-    updated_at: "2024-01-05T00:00:00Z"
-  }
-]
+import { NextRequest } from 'next/server'
+import { getClientById, updateClient, deleteClient } from '@/lib/supabase-db'
+import { initializeDatabase } from '@/lib/supabase-db'
+import { requireAuth, canModifyResource } from '@/lib/api-auth'
+import { ApiResponseHelper } from '@/lib/api-response'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params
-    const client = demoClients.find(c => c.id === id)
-    if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 })
+    await initializeDatabase()
+    
+    // Require authentication
+    const authResult = await requireAuth(request)
+    if (authResult instanceof Response) {
+      return authResult
     }
-    return NextResponse.json(client)
+    const { user } = authResult
+
+    const { id } = await params
+    const client = await getClientById(id)
+    
+    if (!client) {
+      return ApiResponseHelper.notFound('Client not found')
+    }
+
+    // Check if user can view this client
+    if (!canModifyResource(user, undefined, client.region_id)) {
+      return ApiResponseHelper.forbidden('You do not have permission to view this client')
+    }
+    
+    return ApiResponseHelper.success(
+      'Client fetched successfully',
+      { client }
+    )
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch client" }, { status: 500 })
+    console.error('Error fetching client:', error)
+    return ApiResponseHelper.internalError(
+      'Failed to fetch client',
+      error instanceof Error ? error.message : String(error)
+    )
   }
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await initializeDatabase()
+    
+    // Require authentication
+    const authResult = await requireAuth(request)
+    if (authResult instanceof Response) {
+      return authResult
+    }
+    const { user } = authResult
+
     const { id } = await params
     const data = await request.json()
     
-    const clientIndex = demoClients.findIndex(c => c.id === id)
-    if (clientIndex === -1) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 })
+    // Get existing client to check permissions
+    const existingClient = await getClientById(id)
+    if (!existingClient) {
+      return ApiResponseHelper.notFound('Client not found')
+    }
+
+    // Check if user can modify this client
+    if (!canModifyResource(user, undefined, existingClient.region_id)) {
+      return ApiResponseHelper.forbidden('You do not have permission to modify this client')
+    }
+
+    // Validate update data
+    const errors: Record<string, string> = {}
+    if (data.name !== undefined && !data.name.trim()) {
+      errors.name = 'Client name cannot be empty'
+    }
+    if (data.phone !== undefined && !data.phone.trim()) {
+      errors.phone = 'Phone number cannot be empty'
+    }
+    if (data.address !== undefined && !data.address.trim()) {
+      errors.address = 'Address cannot be empty'
+    }
+
+    // Regional managers can only update clients in their region
+    if (data.region_id !== undefined && user.role === 'regional_manager') {
+      if (data.region_id !== user.region_id) {
+        errors.region_id = 'You can only update clients in your region'
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return ApiResponseHelper.validationError('Validation failed', errors)
     }
     
-    // Update client
-    const updatedClient = {
-      ...demoClients[clientIndex],
-      ...data,
-      id: id, // Ensure ID doesn't change
-      updated_at: new Date().toISOString()
+    const updatedClient = await updateClient(id, data)
+    
+    if (!updatedClient) {
+      return ApiResponseHelper.internalError('Failed to update client')
     }
     
-    demoClients[clientIndex] = updatedClient
-    
-    return NextResponse.json(updatedClient)
+    return ApiResponseHelper.success(
+      'Client updated successfully',
+      { client: updatedClient }
+    )
   } catch (error) {
-    return NextResponse.json({ error: "Failed to update client" }, { status: 500 })
+    console.error('Error updating client:', error)
+    return ApiResponseHelper.internalError(
+      'Failed to update client',
+      error instanceof Error ? error.message : String(error)
+    )
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await initializeDatabase()
+    
+    // Require authentication and admin role
+    const authResult = await requireAuth(request)
+    if (authResult instanceof Response) {
+      return authResult
+    }
+    const { user } = authResult
+
+    // Only admin can delete clients
+    if (user.role !== 'admin') {
+      return ApiResponseHelper.forbidden('Only admins can delete clients')
+    }
+
     const { id } = await params
     
-    const clientIndex = demoClients.findIndex(c => c.id === id)
-    if (clientIndex === -1) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 })
+    // Check if client exists
+    const existingClient = await getClientById(id)
+    if (!existingClient) {
+      return ApiResponseHelper.notFound('Client not found')
     }
     
-    const deletedClient = demoClients[clientIndex]
-    demoClients.splice(clientIndex, 1)
+    const success = await deleteClient(id)
     
-    return NextResponse.json({ 
-      message: `Client "${deletedClient.name}" deleted successfully`,
-      client: deletedClient
-    })
+    if (!success) {
+      return ApiResponseHelper.internalError('Failed to delete client')
+    }
+    
+    return ApiResponseHelper.success('Client deleted successfully')
   } catch (error) {
-    return NextResponse.json({ error: "Failed to delete client" }, { status: 500 })
+    console.error('Error deleting client:', error)
+    return ApiResponseHelper.internalError(
+      'Failed to delete client',
+      error instanceof Error ? error.message : String(error)
+    )
   }
 }

@@ -13,7 +13,9 @@ import { Crown, Shield, Zap, Lock, Truck, Edit, Trash2, Plus, CheckCircle, XCirc
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
-import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
+import { useTransportTariffs, useCreateTransportTariff, useUpdateTransportTariff, useDeleteTransportTariff } from "@/lib/supabase-realtime-hooks"
+import { FormInput, FormSelect, FormButton, FormLayout, FormActions } from "@/components/ui/form-components"
+import { FormValidator } from "@/lib/form-validation"
 
 interface TransportTariff {
   id: string
@@ -25,8 +27,11 @@ interface TransportTariff {
 
 function TransportPage() {
   const { user } = useAuth()
-  const [tariffs, setTariffs] = useState<TransportTariff[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: tariffs = [], isLoading: loading, error } = useTransportTariffs()
+  const createTariff = useCreateTransportTariff()
+  const updateTariff = useUpdateTransportTariff()
+  const deleteTariff = useDeleteTransportTariff()
+  
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedTariff, setSelectedTariff] = useState<TransportTariff | null>(null)
@@ -35,31 +40,35 @@ function TransportPage() {
     cost_per_pallet: 0,
     status: 'active' as 'active' | 'inactive'
   })
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   const [addForm, setAddForm] = useState({
     city: '',
     cost_per_pallet: 0,
     status: 'active' as 'active' | 'inactive'
   })
+  const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   
   // Admin permissions
   const isUserAdmin = user?.role === "admin"
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      const response = await fetch('/api/transport')
-      if (response.ok) {
-        const data = await response.json()
-        setTariffs(data.tariffs || [])
-      }
-    } catch (error) {
-      console.error('Error fetching transport tariffs:', error)
-    } finally {
-      setLoading(false)
+  const validateAddForm = (): boolean => {
+    const validationRules = {
+      city: FormValidator.rules.required('City'),
+      cost_per_pallet: FormValidator.rules.positiveNumber('Cost per Pallet')
     }
+    const result = FormValidator.validateForm(addForm, validationRules)
+    setAddErrors(result.errors)
+    return result.isValid
+  }
+
+  const validateEditForm = (): boolean => {
+    const validationRules = {
+      city: FormValidator.rules.required('City'),
+      cost_per_pallet: FormValidator.rules.positiveNumber('Cost per Pallet')
+    }
+    const result = FormValidator.validateForm(editForm, validationRules)
+    setEditErrors(result.errors)
+    return result.isValid
   }
 
   const handleAddTariff = () => {
@@ -72,57 +81,27 @@ function TransportPage() {
   }
 
   const handleCreateTariff = async () => {
-    // Validation
-    if (!addForm.city.trim()) {
-      showEditErrorToast('Transport Tariff', 'City is required')
-      return
-    }
-    if (addForm.cost_per_pallet <= 0) {
-      showEditErrorToast('Transport Tariff', 'Cost per pallet must be greater than 0')
+    if (!validateAddForm()) {
       return
     }
 
     try {
-      const response = await fetch('/api/transport', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(addForm),
+      await createTariff.mutateAsync({
+        city: addForm.city,
+        price: addForm.cost_per_pallet,
+        driver_type: 'factory',
+        region_id: '550e8400-e29b-41d4-a716-446655440001' // Default region
       })
-
-      if (response.ok) {
-        const newTariff = await response.json()
-        
-        // Update local state
-        setTariffs([newTariff, ...tariffs])
-        
-        showEditSuccessToast('Transport Tariff', `New tariff for ${addForm.city} created successfully`)
-        
-        // Log activity
-        await logEditActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'Transport Tariff',
-          newTariff.id,
-          `Created new tariff for ${addForm.city}`,
-          {},
-          addForm
-        )
-        
-        setIsAddDialogOpen(false)
-        setAddForm({
-          city: '',
-          cost_per_pallet: 0,
-          status: 'active'
-        })
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('Transport Tariff', errorData.error || 'Failed to create transport tariff')
-      }
+      
+      setIsAddDialogOpen(false)
+      setAddForm({
+        city: '',
+        cost_per_pallet: 0,
+        status: 'active'
+      })
+      setAddErrors({})
     } catch (error) {
       console.error('Error creating transport tariff:', error)
-      showEditErrorToast('Transport Tariff', 'Network error occurred')
     }
   }
 
@@ -139,104 +118,33 @@ function TransportPage() {
   const handleUpdateTariff = async () => {
     if (!selectedTariff) return
 
-    // Validation
-    if (!editForm.city.trim()) {
-      showEditErrorToast('Transport Tariff', 'City is required')
-      return
-    }
-    if (editForm.cost_per_pallet <= 0) {
-      showEditErrorToast('Transport Tariff', 'Cost per pallet must be greater than 0')
+    if (!validateEditForm()) {
       return
     }
 
     try {
-      const oldValues = {
-        city: selectedTariff.city,
-        cost_per_pallet: selectedTariff.cost_per_pallet,
-        status: selectedTariff.status
-      }
-
-      const response = await fetch(`/api/transport/${selectedTariff.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
+      await updateTariff.mutateAsync({
+        id: selectedTariff.id,
+        updates: {
+          city: editForm.city,
+          price: editForm.cost_per_pallet,
+          status: editForm.status
+        }
       })
-
-      if (response.ok) {
-        // Update local state
-        setTariffs(tariffs.map(t => 
-          t.id === selectedTariff.id 
-            ? { ...t, ...editForm }
-            : t
-        ))
-        
-        showEditSuccessToast('Transport Tariff', editForm.city)
-        
-        // Log activity
-        await logEditActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'Transport Tariff',
-          selectedTariff.id,
-          editForm.city,
-          oldValues,
-          editForm
-        )
-        
-        setIsEditDialogOpen(false)
-        setSelectedTariff(null)
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('Transport Tariff', errorData.error || 'Failed to update transport tariff')
-      }
+      
+      setIsEditDialogOpen(false)
+      setSelectedTariff(null)
+      setEditErrors({})
     } catch (error) {
       console.error('Error updating transport tariff:', error)
-      showEditErrorToast('Transport Tariff', 'Network error occurred')
     }
   }
 
   const handleDeleteTariff = async (tariffId: string) => {
-    const tariffToDelete = tariffs.find(t => t.id === tariffId)
-    if (!tariffToDelete) {
-      showEditErrorToast('Transport Tariff', 'Transport tariff not found')
-      return
-    }
-
     try {
-      const oldValues = {
-        city: tariffToDelete.city,
-        cost_per_pallet: tariffToDelete.cost_per_pallet,
-        status: tariffToDelete.status
-      }
-
-      const response = await fetch(`/api/transport/${tariffId}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        // Update local state
-        setTariffs(tariffs.filter(t => t.id !== tariffId))
-        
-        showDeleteSuccessToast('Transport Tariff', tariffToDelete.city)
-        
-        // Log activity
-        await logDeleteActivity(
-          user?.id || 'unknown',
-          user?.name || 'Unknown User',
-          'Transport Tariff',
-          tariffId,
-          tariffToDelete.city,
-          oldValues
-        )
-      } else {
-        const errorData = await response.json()
-        showEditErrorToast('Transport Tariff', errorData.error || 'Failed to delete transport tariff')
-      }
+      await deleteTariff.mutateAsync(tariffId)
     } catch (error) {
       console.error('Error deleting transport tariff:', error)
-      showEditErrorToast('Transport Tariff', 'Network error occurred')
     }
   }
 
@@ -402,48 +310,58 @@ function TransportPage() {
               Add New Transport Tariff
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="add-city">City</Label>
-              <Input
-                id="add-city"
-                value={addForm.city}
-                onChange={(e) => setAddForm({ ...addForm, city: e.target.value })}
-                placeholder="Enter city name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="add-cost_per_pallet">Cost per Pallet (DA)</Label>
-              <Input
-                id="add-cost_per_pallet"
-                type="number"
-                value={addForm.cost_per_pallet}
-                onChange={(e) => setAddForm({ ...addForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
-                placeholder="Enter cost per pallet"
-              />
-            </div>
-            <div>
-              <Label htmlFor="add-status">Status</Label>
-              <Select value={addForm.status} onValueChange={(value: 'active' | 'inactive') => setAddForm({ ...addForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+          <FormLayout onSubmit={(e) => { e.preventDefault(); handleCreateTariff(); }}>
+            <FormInput
+              label="City"
+              name="add-city"
+              required
+              error={addErrors.city}
+              value={addForm.city}
+              onChange={(e) => setAddForm({ ...addForm, city: e.target.value })}
+              placeholder="Enter city name"
+            />
+            <FormInput
+              label="Cost per Pallet (DA)"
+              name="add-cost_per_pallet"
+              type="number"
+              step="0.01"
+              required
+              error={addErrors.cost_per_pallet}
+              value={addForm.cost_per_pallet}
+              onChange={(e) => setAddForm({ ...addForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter cost per pallet"
+            />
+            <FormSelect
+              label="Status"
+              name="add-status"
+              value={addForm.status}
+              onValueChange={(value: 'active' | 'inactive') => setAddForm({ ...addForm, status: value })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' }
+              ]}
+              placeholder="Select status"
+            />
+            <FormActions>
+              <FormButton 
+                variant="outline" 
+                onClick={() => {
+                  setIsAddDialogOpen(false)
+                  setAddErrors({})
+                }}
+              >
                 Cancel
-              </Button>
-              <Button onClick={handleCreateTariff} className="bg-green-600 hover:bg-green-700">
+              </FormButton>
+              <FormButton 
+                onClick={handleCreateTariff}
+                loading={createTariff.isPending}
+                className="bg-green-600 hover:bg-green-700"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Tariff
-              </Button>
-            </div>
-          </div>
+              </FormButton>
+            </FormActions>
+          </FormLayout>
         </DialogContent>
       </Dialog>
 
@@ -456,47 +374,57 @@ function TransportPage() {
               Edit Transport Tariff
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={editForm.city}
-                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                placeholder="Enter city name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="cost_per_pallet">Cost per Pallet (DA)</Label>
-              <Input
-                id="cost_per_pallet"
-                type="number"
-                value={editForm.cost_per_pallet}
-                onChange={(e) => setEditForm({ ...editForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
-                placeholder="Enter cost per pallet"
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={editForm.status} onValueChange={(value: 'active' | 'inactive') => setEditForm({ ...editForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <FormLayout onSubmit={(e) => { e.preventDefault(); handleUpdateTariff(); }}>
+            <FormInput
+              label="City"
+              name="city"
+              required
+              error={editErrors.city}
+              value={editForm.city}
+              onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+              placeholder="Enter city name"
+            />
+            <FormInput
+              label="Cost per Pallet (DA)"
+              name="cost_per_pallet"
+              type="number"
+              step="0.01"
+              required
+              error={editErrors.cost_per_pallet}
+              value={editForm.cost_per_pallet}
+              onChange={(e) => setEditForm({ ...editForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter cost per pallet"
+            />
+            <FormSelect
+              label="Status"
+              name="status"
+              value={editForm.status}
+              onValueChange={(value: 'active' | 'inactive') => setEditForm({ ...editForm, status: value })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' }
+              ]}
+              placeholder="Select status"
+            />
+            <FormActions>
+              <FormButton 
+                variant="outline" 
+                onClick={() => {
+                  setIsEditDialogOpen(false)
+                  setEditErrors({})
+                }}
+              >
                 Cancel
-              </Button>
-              <Button onClick={handleUpdateTariff} className="bg-blue-600 hover:bg-blue-700">
+              </FormButton>
+              <FormButton 
+                onClick={handleUpdateTariff}
+                loading={updateTariff.isPending}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
                 Update Tariff
-              </Button>
-            </div>
-          </div>
+              </FormButton>
+            </FormActions>
+          </FormLayout>
         </DialogContent>
       </Dialog>
     </div>

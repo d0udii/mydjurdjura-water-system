@@ -353,8 +353,19 @@ const OrdersPage = () => {
         // Find the region for this client
         const region = regions.find(r => r.id === client.region_id)
         
-        // Extract city from client address
-        const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
+        // Extract city from client address - handle multiple formats
+        let city = 'Unknown'
+        if (client.address) {
+          // Try to extract city from address (format: "City, Address" or "Address, City")
+          const addressParts = client.address.split(',')
+          if (addressParts.length > 1) {
+            // If comma-separated, take the first part as city (common format)
+            city = addressParts[0].trim()
+          } else {
+            // If no comma, use the full address as city
+            city = client.address.trim()
+          }
+        }
         
         // Update selected client details with comprehensive information
         setSelectedClientDetails({
@@ -384,7 +395,17 @@ const OrdersPage = () => {
         const client = clients.find(c => c.id === clientId)
         if (client) {
           const region = regions.find(r => r.id === client.region_id)
-          const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
+          
+          // Extract city from client address - handle multiple formats
+          let city = 'Unknown'
+          if (client.address) {
+            const addressParts = client.address.split(',')
+            if (addressParts.length > 1) {
+              city = addressParts[0].trim()
+            } else {
+              city = client.address.trim()
+            }
+          }
           
           setSelectedClientDetails({
             client: {
@@ -416,7 +437,17 @@ const OrdersPage = () => {
       const client = clients.find(c => c.id === clientId)
       if (client) {
         const region = regions.find(r => r.id === client.region_id)
-        const city = client.address ? client.address.split(',')[1]?.trim() || client.address.split(',')[0]?.trim() : 'Unknown'
+        
+        // Extract city from client address - handle multiple formats
+        let city = 'Unknown'
+        if (client.address) {
+          const addressParts = client.address.split(',')
+          if (addressParts.length > 1) {
+            city = addressParts[0].trim()
+          } else {
+            city = client.address.trim()
+          }
+        }
         
         setSelectedClientDetails({
           client: {
@@ -1217,7 +1248,7 @@ const OrdersPage = () => {
                           <User className="h-5 w-5 text-blue-600" /> Client Details
                         </h3>
                         <div className="space-y-4">
-                          <div>
+                          <div className="w-full">
                             <Label htmlFor="client_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                               Select Client
                             </Label>
@@ -1252,7 +1283,7 @@ const OrdersPage = () => {
                           
                           {/* Auto-filled Client Information Display */}
                           {formData.client_id && selectedClientDetails.client && (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800 mt-4">
                               <div className="flex items-center gap-2 mb-4">
                                 <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                 <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">Client Information</span>
@@ -1881,7 +1912,7 @@ const OrdersPage = () => {
                   <User className="h-5 w-5 text-blue-600" /> Client Details
                 </h3>
                 <div className="space-y-4">
-                  <div>
+                  <div className="w-full">
                     <Label htmlFor="edit_client_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Select Client
                     </Label>
@@ -1916,7 +1947,7 @@ const OrdersPage = () => {
                   
                   {/* Auto-filled Client Information Display */}
                   {formData.client_id && selectedClientDetails.client && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800 mt-4">
                       <div className="flex items-center gap-2 mb-4">
                         <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">Client Information</span>

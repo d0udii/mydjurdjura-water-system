@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Edit, Trash2, MoreHorizontal, Download, Phone, Mail, MapPin, User, Building, Eye, CheckCircle, XCircle, Clock, Users, RefreshCw, UserCheck, ShoppingCart, DollarSign, Crown, Shield, Zap, Lock, Unlock, Search, Filter } from "lucide-react"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
-import { useDataStore } from "@/lib/shared-data-store"
+import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from "@/lib/supabase-realtime-hooks"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 
@@ -61,14 +61,15 @@ interface Region {
 
 function ClientsPage() {
   const { user } = useAuth()
-  const { clients, addClient, updateClient, refreshData } = useDataStore()
-  const [regions, setRegions] = useState<Region[]>([])
-  const [supervisors, setSupervisors] = useState<Supervisor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
+  const { data: clients = [], isLoading: loading, error } = useClients()
+  const createClient = useCreateClient()
+  const updateClient = useUpdateClient()
+  const deleteClient = useDeleteClient()
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -80,35 +81,6 @@ function ClientsPage() {
     supervisor_id: "",
     status: "active" as 'active' | 'inactive'
   })
-
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      const [clientsRes, supervisorsRes] = await Promise.all([
-        fetch('/api/clients'),
-        fetch('/api/supervisors')
-      ])
-
-      if (clientsRes.ok) {
-        const clientsData = await clientsRes.json()
-        // Clients are managed by shared data store
-        setRegions(clientsData.regions || [])
-      }
-
-      if (supervisorsRes.ok) {
-        const supervisorsData = await supervisorsRes.json()
-        setSupervisors(supervisorsData.supervisors || [])
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const resetForm = () => {
     setFormData({
@@ -133,33 +105,21 @@ function ClientsPage() {
     }
 
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          rc_number: formData.rc_number,
-          city: formData.city,
-          supervisor_id: formData.supervisor_id,
-          region_id: formData.region_id
-        })
+      await createClient.mutateAsync({
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        rc_number: formData.rc_number,
+        city: formData.city,
+        supervisor_id: formData.supervisor_id,
+        region_id: formData.region_id,
+        contact_person: formData.contact_person,
+        status: formData.status
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        // Add to shared data store for real-time updates
-        addClient(data.client)
-        setIsCreateOpen(false)
-        resetForm()
-        showEditSuccessToast('Client', formData.name)
-      } else {
-        const error = await response.json()
-        showEditErrorToast('Client', error.error || 'Failed to create client')
-      }
+      
+      setIsCreateOpen(false)
+      resetForm()
+      showEditSuccessToast('Client', formData.name)
     } catch (error) {
       console.error("Failed to create client:", error)
       showEditErrorToast('Client', 'Failed to create client')
@@ -217,34 +177,19 @@ function ClientsPage() {
         status: formData.status
       }
 
-      const updatedClient: Client = {
-        ...selectedClient,
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        rc_number: formData.rc_number,
-        region_id: formData.region_id,
-        contact_person: formData.contact_person,
-        status: formData.status,
-        updated_at: new Date().toISOString()
-      }
-
-      // Update via API
-      const response = await fetch(`/api/clients/${selectedClient.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedClient)
+      await updateClient.mutateAsync({
+        id: selectedClient.id,
+        updates: {
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          rc_number: formData.rc_number,
+          region_id: formData.region_id,
+          contact_person: formData.contact_person,
+          status: formData.status
+        }
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update client')
-      }
-
-      // Update shared data store
-      updateClient(updatedClient.id, updatedClient)
       setIsEditOpen(false)
       resetForm()
 
@@ -279,18 +224,7 @@ function ClientsPage() {
       }
 
       // Delete via API
-      const response = await fetch(`/api/clients/${clientId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete client')
-      }
-
-      // Update shared data store
-      // Note: We don't have a deleteClient function in shared data store yet
-      // For now, we'll just show success message
+      await deleteClient.mutateAsync(clientId)
 
       // Show success toast
       showDeleteSuccessToast('Client', clientToDelete.name)

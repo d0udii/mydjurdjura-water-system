@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDataStore } from '@/lib/shared-data-store'
-import { ClipboardList, Plus, Search, RefreshCw, Download, CheckCircle, AlertCircle, XCircle, Edit, Trash2, MoreHorizontal, Package } from "lucide-react"
+import { Package, Edit, Trash2, Plus, Search, Filter } from "lucide-react"
+
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 
@@ -30,27 +30,13 @@ interface PalletTracking {
   intercalaires_bad_condition: number
   return_date: string | null
   notes: string
-  status: "no_return" | "partial_return" | "full_return"
+  status: "no_return" | "partial_return" | "complete_return"
   created_at: string
   updated_at: string
 }
 
-interface Order {
-  id: string
-  client_id: string
-  status: string
-  total_price: number
-  product_5_5L_pallets: number
-  product_1_5L_pallets: number
-  clients?: {
-    name: string
-    address: string
-  }
-}
-
 function PalletTrackingPage() {
   const { user } = useAuth()
-  const { orders, refreshData } = useDataStore()
   const [palletTracking, setPalletTracking] = useState<PalletTracking[]>([])
   const [loading, setLoading] = useState(true)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -72,185 +58,22 @@ function PalletTrackingPage() {
     notes: ""
   })
 
-  // Demo data
-  const demoPalletTracking: PalletTracking[] = [
-    {
-      id: "PALLET-001",
-      order_id: "ORD-001",
-      client_id: "CLI-001",
-      wooden_pallets_sent: 22,
-      intercalaires_sent: 88,
-      wooden_pallets_returned: 20,
-      intercalaires_returned: 80,
-      wooden_pallets_good_condition: 18,
-      wooden_pallets_bad_condition: 2,
-      intercalaires_good_condition: 75,
-      intercalaires_bad_condition: 5,
-      return_date: "2024-01-15",
-      notes: "Client returned most pallets in good condition",
-      status: "partial_return",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-15T00:00:00Z"
-    },
-    {
-      id: "PALLET-002",
-      order_id: "ORD-002",
-      client_id: "CLI-002",
-      wooden_pallets_sent: 24,
-      intercalaires_sent: 96,
-      wooden_pallets_returned: 0,
-      intercalaires_returned: 0,
-      wooden_pallets_good_condition: 0,
-      wooden_pallets_bad_condition: 0,
-      intercalaires_good_condition: 0,
-      intercalaires_bad_condition: 0,
-      return_date: null,
-      notes: "No returns yet",
-      status: "no_return",
-      created_at: "2024-01-02T00:00:00Z",
-      updated_at: "2024-01-02T00:00:00Z"
-    }
-  ]
-
-  const demoOrders: Order[] = [
-    {
-      id: "ORD-001",
-      client_id: "CLI-001",
-      status: "delivered",
-      total_price: 125000,
-      product_5_5L_pallets: 11,
-      product_1_5L_pallets: 11,
-      clients: {
-        name: "Biskra Water Distributor",
-        address: "123 Main Street, Biskra"
-      }
-    },
-    {
-      id: "ORD-002",
-      client_id: "CLI-002",
-      status: "delivered",
-      total_price: 89000,
-      product_5_5L_pallets: 12,
-      product_1_5L_pallets: 12,
-      clients: {
-        name: "Ouled Djellal Store",
-        address: "456 Market Square, Ouled Djellal"
-      }
-    }
-  ]
-
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        
-        // Fetch pallet tracking data
-        const trackingResponse = await fetch('/api/pallet-tracking')
-        if (trackingResponse.ok) {
-          const trackingData = await trackingResponse.json()
-          setPalletTracking(trackingData.palletTracking || [])
-        }
-        
-        // Refresh orders from shared data store
-        await refreshData()
-        
-      } catch (error) {
-        console.error('Error fetching pallet tracking data:', error)
-        // Fallback to demo data
-        setPalletTracking(demoPalletTracking)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchData()
-    
-    // Set up real-time updates
-    const interval = setInterval(fetchData, 10000) // Update every 10 seconds
-    
-    return () => clearInterval(interval)
-  }, [refreshData])
+    fetchPalletTracking()
+  }, [])
 
-  const calculatePalletsFromOrder = (order: Order) => {
-    const totalPallets = order.product_5_5L_pallets + order.product_1_5L_pallets
-    return {
-      wooden_pallets: totalPallets,
-      intercalaires: totalPallets * 4 // 4 intercalaires per pallet
-    }
-  }
-
-  const handleCreateTracking = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Validate required fields with proper handling of zero values
-    if (!formData.order_id || formData.order_id.trim() === '') {
-      alert("Please select an order")
-      return
-    }
-    
-    if (formData.wooden_pallets_sent === undefined || formData.wooden_pallets_sent === null || formData.wooden_pallets_sent === '') {
-      alert("Please enter wooden pallets sent quantity")
-      return
-    }
-    
-    if (formData.intercalaires_sent === undefined || formData.intercalaires_sent === null || formData.intercalaires_sent === '') {
-      alert("Please enter intercalaires sent quantity")
-      return
-    }
-    
-    // Validate that quantities are non-negative
-    if (parseInt(formData.wooden_pallets_sent) < 0) {
-      alert("Wooden pallets sent cannot be negative")
-      return
-    }
-    
-    if (parseInt(formData.intercalaires_sent) < 0) {
-      alert("Intercalaires sent cannot be negative")
-      return
-    }
-
-    // Find the client_id from the selected order
-    const selectedOrder = orders.find(order => order.id === formData.order_id)
-    if (!selectedOrder) {
-      alert("Selected order not found")
-      return
-    }
-
+  const fetchPalletTracking = async () => {
     try {
-      const response = await fetch('/api/pallet-tracking', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: formData.order_id,
-          client_id: selectedOrder.client_id,
-          wooden_pallets_sent: parseInt(formData.wooden_pallets_sent),
-          intercalaires_sent: parseInt(formData.intercalaires_sent),
-          wooden_pallets_returned: parseInt(formData.wooden_pallets_returned) || 0,
-          intercalaires_returned: parseInt(formData.intercalaires_returned) || 0,
-          wooden_pallets_good_condition: parseInt(formData.wooden_pallets_good_condition) || 0,
-          wooden_pallets_bad_condition: parseInt(formData.wooden_pallets_bad_condition) || 0,
-          intercalaires_good_condition: parseInt(formData.intercalaires_good_condition) || 0,
-          intercalaires_bad_condition: parseInt(formData.intercalaires_bad_condition) || 0,
-          return_date: formData.return_date || null,
-          notes: formData.notes || ""
-        })
-      })
-
+      setLoading(true)
+      const response = await fetch('/api/pallet-tracking')
       if (response.ok) {
         const data = await response.json()
-        setPalletTracking(prev => [data.palletTracking, ...prev])
-        setIsCreateOpen(false)
-        resetForm()
-        alert(data.message || 'Pallet tracking record created successfully')
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to create pallet tracking')
+        setPalletTracking(data.palletTracking || [])
       }
     } catch (error) {
-      console.error("Failed to create pallet tracking:", error)
-      alert('Failed to create pallet tracking')
+      console.error('Error fetching pallet tracking:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -270,7 +93,48 @@ function PalletTrackingPage() {
     })
   }
 
-  const handleEdit = (tracking: PalletTracking) => {
+  const handleCreateTracking = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.order_id || !formData.wooden_pallets_sent || !formData.intercalaires_sent) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/pallet-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          wooden_pallets_sent: parseInt(formData.wooden_pallets_sent),
+          intercalaires_sent: parseInt(formData.intercalaires_sent),
+          wooden_pallets_returned: parseInt(formData.wooden_pallets_returned) || 0,
+          intercalaires_returned: parseInt(formData.intercalaires_returned) || 0,
+          wooden_pallets_good_condition: parseInt(formData.wooden_pallets_good_condition) || 0,
+          wooden_pallets_bad_condition: parseInt(formData.wooden_pallets_bad_condition) || 0,
+          intercalaires_good_condition: parseInt(formData.intercalaires_good_condition) || 0,
+          intercalaires_bad_condition: parseInt(formData.intercalaires_bad_condition) || 0,
+          status: 'no_return'
+        }),
+      })
+
+      if (response.ok) {
+        await fetchPalletTracking() // Refetch to ensure consistency
+        setIsCreateOpen(false)
+        resetForm()
+      } else {
+        alert('Failed to create pallet tracking')
+      }
+    } catch (error) {
+      console.error('Error creating pallet tracking:', error)
+      alert('Failed to create pallet tracking')
+    }
+  }
+
+  const handleEditTracking = (tracking: PalletTracking) => {
     setSelectedTracking(tracking)
     setFormData({
       order_id: tracking.order_id,
@@ -288,25 +152,67 @@ function PalletTrackingPage() {
     setIsEditOpen(true)
   }
 
-  const handleDelete = async (trackingId: string) => {
+  const handleUpdateTracking = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedTracking) return
+
     try {
-      const response = await fetch(`/api/pallet-tracking?id=${trackingId}`, {
-        method: 'DELETE'
+      const response = await fetch('/api/pallet-tracking', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedTracking.id,
+          ...formData,
+          wooden_pallets_sent: parseInt(formData.wooden_pallets_sent),
+          intercalaires_sent: parseInt(formData.intercalaires_sent),
+          wooden_pallets_returned: parseInt(formData.wooden_pallets_returned) || 0,
+          intercalaires_returned: parseInt(formData.intercalaires_returned) || 0,
+          wooden_pallets_good_condition: parseInt(formData.wooden_pallets_good_condition) || 0,
+          wooden_pallets_bad_condition: parseInt(formData.wooden_pallets_bad_condition) || 0,
+          intercalaires_good_condition: parseInt(formData.intercalaires_good_condition) || 0,
+          intercalaires_bad_condition: parseInt(formData.intercalaires_bad_condition) || 0
+        }),
       })
 
       if (response.ok) {
-        setPalletTracking(prev => prev.filter(tracking => tracking.id !== trackingId))
-        alert("Pallet tracking record deleted successfully!")
+        await fetchPalletTracking() // Refetch to ensure consistency
+        setIsEditOpen(false)
+        setSelectedTracking(null)
+        resetForm()
       } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to delete pallet tracking')
+        alert('Failed to update pallet tracking')
       }
     } catch (error) {
-      console.error("Failed to delete pallet tracking:", error)
+      console.error('Error updating pallet tracking:', error)
+      alert('Failed to update pallet tracking')
+    }
+  }
+
+  const handleDeleteTracking = async (trackingId: string) => {
+    try {
+      const response = await fetch('/api/pallet-tracking', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: trackingId }),
+      })
+
+      if (response.ok) {
+        await fetchPalletTracking() // Refetch to ensure consistency
+      } else {
+        alert('Failed to delete pallet tracking')
+      }
+    } catch (error) {
+      console.error('Error deleting pallet tracking:', error)
       alert('Failed to delete pallet tracking')
     }
   }
 
+  // Filter tracking based on search and status
   const filteredTracking = palletTracking.filter(tracking => {
     const matchesSearch = tracking.order_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          tracking.client_id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -314,484 +220,400 @@ function PalletTrackingPage() {
     return matchesSearch && matchesStatus
   })
 
-  const canManageTracking = user?.role === "admin" || user?.role === "operations"
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'complete_return': return 'default'
+      case 'partial_return': return 'secondary'
+      case 'no_return': return 'destructive'
+      default: return 'default'
+    }
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading Pallet Tracking...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        {/* Enhanced Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg">
-                  <ClipboardList className="h-6 w-6 text-white" />
-                </div>
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                  Pallet Tracking
-                </h1>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
-                Track wooden pallets and intercalaires sent to clients and monitor returns
-              </p>
-            </div>
-            
-            {canManageTracking && (
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    size="lg"
-                    className="w-full lg:w-auto bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                    onClick={resetForm}
-                  >
-                    <Plus className="mr-2 h-5 w-5" />
-                    Add Tracking Record
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                        <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      Add Pallet Tracking Record
-                    </DialogTitle>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      Track pallets and intercalaires sent to clients and monitor their return status.
-                    </p>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateTracking} className="space-y-6 pt-4">
-                    <div>
-                      <Label htmlFor="order_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Order <span className="text-red-500">*</span>
-                      </Label>
-                      <select
-                        id="order_id"
-                        value={formData.order_id}
-                        onChange={(e) => {
-                          const selectedOrder = orders.find(o => o.id === e.target.value)
-                          if (selectedOrder) {
-                            const pallets = calculatePalletsFromOrder(selectedOrder)
-                            setFormData({ 
-                              ...formData, 
-                              order_id: e.target.value,
-                              wooden_pallets_sent: pallets.wooden_pallets.toString(),
-                              intercalaires_sent: pallets.intercalaires.toString()
-                            })
-                          } else {
-                            setFormData({ ...formData, order_id: e.target.value })
-                          }
-                        }}
-                        className="w-full h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      >
-                        <option value="">Select an order...</option>
-                        {orders.map((order) => (
-                          <option key={order.id} value={order.id}>
-                            {order.id} - {order.clients?.name} ({order.clients?.address})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Pallet Tracking</h1>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Tracking
+        </Button>
+      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="wooden_pallets_sent" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Wooden Pallets Sent <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="wooden_pallets_sent"
-                          type="number"
-                          value={formData.wooden_pallets_sent}
-                          onChange={(e) => setFormData({ ...formData, wooden_pallets_sent: e.target.value })}
-                          placeholder="22"
-                          className="h-12"
-                          min="0"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="intercalaires_sent" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Intercalaires Sent <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="intercalaires_sent"
-                          type="number"
-                          value={formData.intercalaires_sent}
-                          onChange={(e) => setFormData({ ...formData, intercalaires_sent: e.target.value })}
-                          placeholder="88"
-                          className="h-12"
-                          min="0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Return Information</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="wooden_pallets_returned" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Wooden Pallets Returned
-                          </Label>
-                          <Input
-                            id="wooden_pallets_returned"
-                            type="number"
-                            value={formData.wooden_pallets_returned}
-                            onChange={(e) => setFormData({ ...formData, wooden_pallets_returned: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="intercalaires_returned" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Intercalaires Returned
-                          </Label>
-                          <Input
-                            id="intercalaires_returned"
-                            type="number"
-                            value={formData.intercalaires_returned}
-                            onChange={(e) => setFormData({ ...formData, intercalaires_returned: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Condition Assessment</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="wooden_pallets_good_condition" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Wooden Pallets - Good Condition
-                          </Label>
-                          <Input
-                            id="wooden_pallets_good_condition"
-                            type="number"
-                            value={formData.wooden_pallets_good_condition}
-                            onChange={(e) => setFormData({ ...formData, wooden_pallets_good_condition: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="wooden_pallets_bad_condition" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Wooden Pallets - Bad Condition
-                          </Label>
-                          <Input
-                            id="wooden_pallets_bad_condition"
-                            type="number"
-                            value={formData.wooden_pallets_bad_condition}
-                            onChange={(e) => setFormData({ ...formData, wooden_pallets_bad_condition: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="intercalaires_good_condition" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Intercalaires - Good Condition
-                          </Label>
-                          <Input
-                            id="intercalaires_good_condition"
-                            type="number"
-                            value={formData.intercalaires_good_condition}
-                            onChange={(e) => setFormData({ ...formData, intercalaires_good_condition: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="intercalaires_bad_condition" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Intercalaires - Bad Condition
-                          </Label>
-                          <Input
-                            id="intercalaires_bad_condition"
-                            type="number"
-                            value={formData.intercalaires_bad_condition}
-                            onChange={(e) => setFormData({ ...formData, intercalaires_bad_condition: e.target.value })}
-                            placeholder="0"
-                            className="h-12"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="return_date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Return Date
-                        </Label>
-                        <Input
-                          id="return_date"
-                          type="date"
-                          value={formData.return_date}
-                          onChange={(e) => setFormData({ ...formData, return_date: e.target.value })}
-                          className="h-12"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          placeholder="Additional notes about pallet condition..."
-                          className="min-h-[100px]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreateOpen(false)}
-                        className="px-6"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="px-8 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        Create Tracking Record
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+      {/* Search and Filter */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex gap-4">
             <div className="flex-1">
+              <Label htmlFor="search">Search</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by Order ID or Client ID..."
+                  id="search"
+                  placeholder="Search by order ID or client ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12"
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="h-12 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="all">All Status</option>
-                <option value="no_return">No Return</option>
-                <option value="partial_return">Partial Return</option>
-                <option value="full_return">Full Return</option>
-              </select>
-              <Button variant="outline" size="sm" className="h-12 px-4">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <div className="w-48">
+              <Label htmlFor="status">Status</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <Filter className="w-4 h-4 mr-2" />
+                    {filterStatus === "all" ? "All Statuses" : filterStatus.replace('_', ' ')}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setFilterStatus("all")}>
+                    All Statuses
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("no_return")}>
+                    No Return
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("partial_return")}>
+                    Partial Return
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus("complete_return")}>
+                    Complete Return
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Enhanced Pallet Tracking Table */}
-        <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-t-xl">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                  <ClipboardList className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-bold">Pallet Tracking ({filteredTracking.length})</CardTitle>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Monitor pallet and intercalaire returns</p>
-                </div>
+      {/* Pallet Tracking Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Pallet Tracking ({filteredTracking.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Client ID</TableHead>
+                <TableHead>Sent</TableHead>
+                <TableHead>Returned</TableHead>
+                <TableHead>Good Condition</TableHead>
+                <TableHead>Bad Condition</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Return Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTracking.map((tracking) => (
+                <TableRow key={tracking.id}>
+                  <TableCell className="font-medium">{tracking.order_id}</TableCell>
+                  <TableCell>{tracking.client_id}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>Wooden: {tracking.wooden_pallets_sent}</div>
+                      <div>Intercalaires: {tracking.intercalaires_sent}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>Wooden: {tracking.wooden_pallets_returned}</div>
+                      <div>Intercalaires: {tracking.intercalaires_returned}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>Wooden: {tracking.wooden_pallets_good_condition}</div>
+                      <div>Intercalaires: {tracking.intercalaires_good_condition}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>Wooden: {tracking.wooden_pallets_bad_condition}</div>
+                      <div>Intercalaires: {tracking.intercalaires_bad_condition}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusColor(tracking.status) as any}>
+                      {tracking.status.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {tracking.return_date ? new Date(tracking.return_date).toLocaleDateString() : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditTracking(tracking)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Pallet Tracking</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this pallet tracking record? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteTracking(tracking.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          {filteredTracking.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No pallet tracking records found
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create Tracking Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Pallet Tracking</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateTracking} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="order_id">Order ID *</Label>
+                <Input
+                  id="order_id"
+                  value={formData.order_id}
+                  onChange={(e) => setFormData({ ...formData, order_id: e.target.value })}
+                  placeholder="Order ID"
+                  required
+                />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="hover:bg-purple-50 dark:hover:bg-purple-900/20">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
+              <div>
+                <Label htmlFor="return_date">Return Date</Label>
+                <Input
+                  id="return_date"
+                  type="date"
+                  value={formData.return_date}
+                  onChange={(e) => setFormData({ ...formData, return_date: e.target.value })}
+                />
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 dark:bg-gray-700">
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Order</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Client</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Sent</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Returned</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Condition</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Return Date</TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTracking.map((tracking) => {
-                    const order = orders.find(o => o.id === tracking.order_id)
-                    return (
-                      <TableRow key={tracking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900 dark:text-white">{tracking.order_id}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">ID: {tracking.id}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900 dark:text-white">{order?.clients?.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{order?.clients?.address}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {tracking.wooden_pallets_sent} wooden pallets
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {tracking.intercalaires_sent} intercalaires
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {tracking.wooden_pallets_returned} wooden pallets
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {tracking.intercalaires_returned} intercalaires
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-sm">
-                              <span className="text-green-600 dark:text-green-400 font-medium">
-                                Good: {tracking.wooden_pallets_good_condition + tracking.intercalaires_good_condition}
-                              </span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="text-red-600 dark:text-red-400 font-medium">
-                                Bad: {tracking.wooden_pallets_bad_condition + tracking.intercalaires_bad_condition}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={tracking.status === "full_return" ? "default" : "secondary"}
-                            className={
-                              tracking.status === "full_return" 
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                                : tracking.status === "partial_return"
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            }
-                          >
-                            {tracking.status === "full_return" && <CheckCircle className="h-3 w-3 mr-1" />}
-                            {tracking.status === "partial_return" && <AlertCircle className="h-3 w-3 mr-1" />}
-                            {tracking.status === "no_return" && <XCircle className="h-3 w-3 mr-1" />}
-                            {tracking.status.replace('_', ' ').toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-gray-500">
-                            {tracking.return_date ? new Date(tracking.return_date).toLocaleDateString() : "Not returned"}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {canManageTracking && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEdit(tracking)}
-                                  className="hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Tracking Record</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete this pallet tracking record? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(tracking.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Package className="mr-2 h-4 w-4" />
-                                  View Order Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Export PDF
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="wooden_pallets_sent">Wooden Pallets Sent *</Label>
+                <Input
+                  id="wooden_pallets_sent"
+                  type="number"
+                  value={formData.wooden_pallets_sent}
+                  onChange={(e) => setFormData({ ...formData, wooden_pallets_sent: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="intercalaires_sent">Intercalaires Sent *</Label>
+                <Input
+                  id="intercalaires_sent"
+                  type="number"
+                  value={formData.intercalaires_sent}
+                  onChange={(e) => setFormData({ ...formData, intercalaires_sent: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="wooden_pallets_returned">Wooden Pallets Returned</Label>
+                <Input
+                  id="wooden_pallets_returned"
+                  type="number"
+                  value={formData.wooden_pallets_returned}
+                  onChange={(e) => setFormData({ ...formData, wooden_pallets_returned: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="intercalaires_returned">Intercalaires Returned</Label>
+                <Input
+                  id="intercalaires_returned"
+                  type="number"
+                  value={formData.intercalaires_returned}
+                  onChange={(e) => setFormData({ ...formData, intercalaires_returned: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="wooden_pallets_good_condition">Wooden Pallets Good Condition</Label>
+                <Input
+                  id="wooden_pallets_good_condition"
+                  type="number"
+                  value={formData.wooden_pallets_good_condition}
+                  onChange={(e) => setFormData({ ...formData, wooden_pallets_good_condition: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="wooden_pallets_bad_condition">Wooden Pallets Bad Condition</Label>
+                <Input
+                  id="wooden_pallets_bad_condition"
+                  type="number"
+                  value={formData.wooden_pallets_bad_condition}
+                  onChange={(e) => setFormData({ ...formData, wooden_pallets_bad_condition: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="intercalaires_good_condition">Intercalaires Good Condition</Label>
+                <Input
+                  id="intercalaires_good_condition"
+                  type="number"
+                  value={formData.intercalaires_good_condition}
+                  onChange={(e) => setFormData({ ...formData, intercalaires_good_condition: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="intercalaires_bad_condition">Intercalaires Bad Condition</Label>
+                <Input
+                  id="intercalaires_bad_condition"
+                  type="number"
+                  value={formData.intercalaires_bad_condition}
+                  onChange={(e) => setFormData({ ...formData, intercalaires_bad_condition: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Add Tracking</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tracking Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Pallet Tracking</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateTracking} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_order_id">Order ID *</Label>
+                <Input
+                  id="edit_order_id"
+                  value={formData.order_id}
+                  onChange={(e) => setFormData({ ...formData, order_id: e.target.value })}
+                  placeholder="Order ID"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_return_date">Return Date</Label>
+                <Input
+                  id="edit_return_date"
+                  type="date"
+                  value={formData.return_date}
+                  onChange={(e) => setFormData({ ...formData, return_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit_wooden_pallets_sent">Wooden Pallets Sent *</Label>
+                <Input
+                  id="edit_wooden_pallets_sent"
+                  type="number"
+                  value={formData.wooden_pallets_sent}
+                  onChange={(e) => setFormData({ ...formData, wooden_pallets_sent: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit_intercalaires_sent">Intercalaires Sent *</Label>
+                <Input
+                  id="edit_intercalaires_sent"
+                  type="number"
+                  value={formData.intercalaires_sent}
+                  onChange={(e) => setFormData({ ...formData, intercalaires_sent: e.target.value })}
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit_notes">Notes</Label>
+              <Textarea
+                id="edit_notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Tracking</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

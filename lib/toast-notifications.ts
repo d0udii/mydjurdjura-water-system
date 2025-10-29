@@ -1,76 +1,289 @@
-// Toast notification system for edit confirmations
-import { toast } from "sonner"
+/**
+ * Toast Notification System
+ * Provides success and error notifications for all CRUD operations
+ */
+
+import { toast } from 'sonner'
 
 export interface ToastConfig {
-  title: string
+  title?: string
   description?: string
-  type?: 'success' | 'error' | 'warning' | 'info'
   duration?: number
 }
 
-export const showEditToast = (config: ToastConfig) => {
-  const { title, description, type = 'success', duration = 4000 } = config
-  
-  switch (type) {
-    case 'success':
-      toast.success(title, {
-        description,
-        duration,
-        className: "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200"
-      })
+// Success Toast Functions
+export const showSuccessToast = (message: string, config?: ToastConfig) => {
+  toast.success(message, {
+    description: config?.description,
+    duration: config?.duration || 4000,
+  })
+}
+
+export const showCreateSuccessToast = (entity: string, config?: ToastConfig) => {
+  showSuccessToast(`${entity} created successfully!`, {
+    description: config?.description || `The ${entity.toLowerCase()} has been added to the system.`,
+    ...config
+  })
+}
+
+export const showUpdateSuccessToast = (entity: string, config?: ToastConfig) => {
+  showSuccessToast(`${entity} updated successfully!`, {
+    description: config?.description || `The ${entity.toLowerCase()} has been updated.`,
+    ...config
+  })
+}
+
+export const showDeleteSuccessToast = (entity: string, config?: ToastConfig) => {
+  showSuccessToast(`${entity} deleted successfully!`, {
+    description: config?.description || `The ${entity.toLowerCase()} has been removed from the system.`,
+    ...config
+  })
+}
+
+// Error Toast Functions
+export const showErrorToast = (message: string, config?: ToastConfig) => {
+  toast.error(message, {
+    description: config?.description,
+    duration: config?.duration || 6000,
+  })
+}
+
+export const showCreateErrorToast = (entity: string, error?: any, config?: ToastConfig) => {
+  const errorMessage = error?.message || 'Unknown error occurred'
+  showErrorToast(`Failed to create ${entity.toLowerCase()}`, {
+    description: config?.description || `Error: ${errorMessage}`,
+    ...config
+  })
+}
+
+export const showUpdateErrorToast = (entity: string, error?: any, config?: ToastConfig) => {
+  const errorMessage = error?.message || 'Unknown error occurred'
+  showErrorToast(`Failed to update ${entity.toLowerCase()}`, {
+    description: config?.description || `Error: ${errorMessage}`,
+    ...config
+  })
+}
+
+export const showDeleteErrorToast = (entity: string, error?: any, config?: ToastConfig) => {
+  const errorMessage = error?.message || 'Unknown error occurred'
+  showErrorToast(`Failed to delete ${entity.toLowerCase()}`, {
+    description: config?.description || `Error: ${errorMessage}`,
+    ...config
+  })
+}
+
+export const showFetchErrorToast = (entity: string, error?: any, config?: ToastConfig) => {
+  const errorMessage = error?.message || 'Unknown error occurred'
+  showErrorToast(`Failed to load ${entity.toLowerCase()}`, {
+    description: config?.description || `Error: ${errorMessage}`,
+    ...config
+  })
+}
+
+// Loading Toast Functions
+export const showLoadingToast = (message: string) => {
+  return toast.loading(message, {
+    duration: Infinity,
+  })
+}
+
+export const dismissToast = (toastId: string) => {
+  toast.dismiss(toastId)
+}
+
+// Specific Entity Toasts
+export const showClientSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Client')
       break
-    case 'error':
-      toast.error(title, {
-        description,
-        duration,
-        className: "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200"
-      })
+    case 'update':
+      showUpdateSuccessToast('Client')
       break
-    case 'warning':
-      toast.warning(title, {
-        description,
-        duration,
-        className: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200"
-      })
-      break
-    case 'info':
-      toast.info(title, {
-        description,
-        duration,
-        className: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200"
-      })
+    case 'delete':
+      showDeleteSuccessToast('Client')
       break
   }
 }
 
-export const showEditSuccessToast = (entityType: string, entityName: string) => {
-  showEditToast({
-    title: `${entityType} Updated Successfully`,
-    description: `${entityName} has been updated and saved to the database.`,
-    type: 'success'
-  })
+export const showClientErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Client', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Client', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Client', error)
+      break
+  }
 }
 
-export const showEditErrorToast = (entityType: string, error: string) => {
-  showEditToast({
-    title: `Failed to Update ${entityType}`,
-    description: error,
-    type: 'error'
-  })
+export const showOrderSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Order')
+      break
+    case 'update':
+      showUpdateSuccessToast('Order')
+      break
+    case 'delete':
+      showDeleteSuccessToast('Order')
+      break
+  }
 }
 
-export const showDeleteSuccessToast = (entityType: string, entityName: string) => {
-  showEditToast({
-    title: `${entityType} Deleted Successfully`,
-    description: `${entityName} has been removed from the database.`,
-    type: 'success'
-  })
+export const showOrderErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Order', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Order', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Order', error)
+      break
+  }
 }
 
-export const showDeleteErrorToast = (entityType: string, error: string) => {
-  showEditToast({
-    title: `Failed to Delete ${entityType}`,
-    description: error,
-    type: 'error'
-  })
+export const showTransportTariffSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Transport Tariff')
+      break
+    case 'update':
+      showUpdateSuccessToast('Transport Tariff')
+      break
+    case 'delete':
+      showDeleteSuccessToast('Transport Tariff')
+      break
+  }
+}
+
+export const showTransportTariffErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Transport Tariff', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Transport Tariff', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Transport Tariff', error)
+      break
+  }
+}
+
+export const showProductSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Product')
+      break
+    case 'update':
+      showUpdateSuccessToast('Product')
+      break
+    case 'delete':
+      showDeleteSuccessToast('Product')
+      break
+  }
+}
+
+export const showProductErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Product', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Product', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Product', error)
+      break
+  }
+}
+
+export const showBLNumberSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('BL Number')
+      break
+    case 'update':
+      showUpdateSuccessToast('BL Number')
+      break
+    case 'delete':
+      showDeleteSuccessToast('BL Number')
+      break
+  }
+}
+
+export const showBLNumberErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('BL Number', error)
+      break
+    case 'update':
+      showUpdateErrorToast('BL Number', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('BL Number', error)
+      break
+  }
+}
+
+export const showGoalSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Goal')
+      break
+    case 'update':
+      showUpdateSuccessToast('Goal')
+      break
+    case 'delete':
+      showDeleteSuccessToast('Goal')
+      break
+  }
+}
+
+export const showGoalErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Goal', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Goal', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Goal', error)
+      break
+  }
+}
+
+export const showNotificationSuccessToast = (action: 'create' | 'update' | 'delete') => {
+  switch (action) {
+    case 'create':
+      showCreateSuccessToast('Notification')
+      break
+    case 'update':
+      showUpdateSuccessToast('Notification')
+      break
+    case 'delete':
+      showDeleteSuccessToast('Notification')
+      break
+  }
+}
+
+export const showNotificationErrorToast = (action: 'create' | 'update' | 'delete', error?: any) => {
+  switch (action) {
+    case 'create':
+      showCreateErrorToast('Notification', error)
+      break
+    case 'update':
+      showUpdateErrorToast('Notification', error)
+      break
+    case 'delete':
+      showDeleteErrorToast('Notification', error)
+      break
+  }
 }

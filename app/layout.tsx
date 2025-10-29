@@ -10,6 +10,8 @@ import { ConditionalLayout } from "@/components/conditional-layout"
 import { ToastProvider } from "@/lib/toast-context"
 import { Toaster } from "@/components/ui/sonner"
 import { ErrorBoundary, setupGlobalErrorHandling } from "@/components/error-boundary"
+import { ReactQueryProvider } from "@/lib/react-query-provider"
+import { RealtimeProvider } from "@/components/realtime-provider"
 
 import { Geist_Mono, Poppins as V0_Font_Poppins, Geist_Mono as V0_Font_Geist_Mono, Source_Serif_4 as V0_Font_Source_Serif_4 } from 'next/font/google'
 
@@ -50,21 +52,25 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistMono.variable} ${poppins.variable} ${sourceSerif4.variable} font-sans antialiased`}>
         <ErrorBoundary>
-          <AuthProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <ToastProvider>
-                <ConditionalLayout>
-                  {children}
-                </ConditionalLayout>
-                <Toaster />
-              </ToastProvider>
-            </ThemeProvider>
-          </AuthProvider>
+          <ReactQueryProvider>
+            <RealtimeProvider>
+              <AuthProvider>
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="system"
+                  enableSystem
+                  disableTransitionOnChange
+                >
+                  <ToastProvider>
+                    <ConditionalLayout>
+                      {children}
+                    </ConditionalLayout>
+                    <Toaster />
+                  </ToastProvider>
+                </ThemeProvider>
+              </AuthProvider>
+            </RealtimeProvider>
+          </ReactQueryProvider>
         </ErrorBoundary>
         <Analytics />
       </body>
