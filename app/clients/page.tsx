@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Edit, Trash2, MoreHorizontal, Download, Phone, Mail, MapPin, User, Building, Eye, CheckCircle, XCircle, Clock, Users, RefreshCw, UserCheck, ShoppingCart, DollarSign, Crown, Shield, Zap, Lock, Unlock, Search, Filter } from "lucide-react"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
-import { useClients, useCreateClient, useUpdateClient, useDeleteClient, useRegions } from "@/lib/supabase-realtime-hooks"
+import { useClients, useCreateClient, useUpdateClient, useDeleteClient, useRegions, useTransportTariffs } from "@/lib/supabase-realtime-hooks"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 
@@ -63,6 +63,7 @@ function ClientsPage() {
   const { user } = useAuth()
   const { data: clients = [], isLoading: loading, error } = useClients()
   const { data: regions = [] } = useRegions()
+  const { data: transportTariffs = [] } = useTransportTariffs()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -82,6 +83,23 @@ function ClientsPage() {
     supervisor_id: "",
     status: "active" as 'active' | 'inactive'
   })
+
+  // Get unique cities from transport tariffs
+  const uniqueCities = Array.from(
+    new Map(
+      (transportTariffs as any[]).map((tariff: any) => [tariff.city, { city: tariff.city, region_id: tariff.region_id }])
+    ).values()
+  ).sort((a: any, b: any) => a.city.localeCompare(b.city))
+
+  // Handle city selection - auto-populate region
+  const handleCityChange = (city: string) => {
+    const tariff = (transportTariffs as any[]).find((t: any) => t.city === city)
+    setFormData({
+      ...formData,
+      city,
+      region_id: tariff?.region_id || ""
+    })
+  }
 
   const resetForm = () => {
     setFormData({
@@ -456,25 +474,30 @@ function ClientsPage() {
                         </div>
 
                         <div>
-                          <Label htmlFor="region_id" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <Label htmlFor="city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-blue-600" />
-                            Region <span className="text-red-500">*</span>
+                            City <span className="text-red-500">*</span>
                           </Label>
                           <Select
-                            value={formData.region_id}
-                            onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                            value={formData.city}
+                            onValueChange={handleCityChange}
                           >
                             <SelectTrigger className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                              <SelectValue placeholder="Select region" />
+                              <SelectValue placeholder="Select city (region auto-fills)" />
                             </SelectTrigger>
                             <SelectContent>
-                              {regions.map((region) => (
-                                <SelectItem key={region.id} value={region.id}>
-                                  {region.name}
+                              {uniqueCities.map((item) => (
+                                <SelectItem key={item.city} value={item.city}>
+                                  {item.city}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          {formData.region_id && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Region: {(regions as any[]).find((r: any) => r.id === formData.region_id)?.name || 'Unknown'}
+                            </p>
+                          )}
                         </div>
 
                         <div>
@@ -488,20 +511,6 @@ function ClientsPage() {
                             onChange={(e) => setFormData({ ...formData, rc_number: e.target.value })}
                             className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                             placeholder="Enter RC number"
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <Building className="h-4 w-4 text-blue-600" />
-                            City
-                          </Label>
-                          <Input
-                            id="city"
-                            value={formData.city}
-                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                            className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                            placeholder="Enter city"
                           />
                         </div>
 
@@ -784,25 +793,30 @@ function ClientsPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="edit-region" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <Label htmlFor="edit-city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-blue-600" />
-                    Region <span className="text-red-500">*</span>
+                    City <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={formData.region_id}
-                    onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                    value={formData.city}
+                    onValueChange={handleCityChange}
                   >
                     <SelectTrigger className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                      <SelectValue placeholder="Select region" />
+                      <SelectValue placeholder="Select city (region auto-fills)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {regions.map((region) => (
-                        <SelectItem key={region.id} value={region.id}>
-                          {region.name}
+                      {uniqueCities.map((item) => (
+                        <SelectItem key={item.city} value={item.city}>
+                          {item.city}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {formData.region_id && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Region: {(regions as any[]).find((r: any) => r.id === formData.region_id)?.name || 'Unknown'}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -816,20 +830,6 @@ function ClientsPage() {
                     onChange={(e) => setFormData({ ...formData, rc_number: e.target.value })}
                     className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                     placeholder="Enter RC number"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="edit-city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <Building className="h-4 w-4 text-blue-600" />
-                    City
-                  </Label>
-                  <Input
-                    id="edit-city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                    placeholder="Enter city"
                   />
                 </div>
 
