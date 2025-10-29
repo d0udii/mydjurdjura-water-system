@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Edit, Trash2, MoreHorizontal, Download, Phone, Mail, MapPin, User, Building, Eye, CheckCircle, XCircle, Clock, Users, RefreshCw, UserCheck, ShoppingCart, DollarSign, Crown, Shield, Zap, Lock, Unlock, Search, Filter } from "lucide-react"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
 import { logEditActivity, logDeleteActivity } from "@/lib/activity-logging"
-import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from "@/lib/supabase-realtime-hooks"
+import { useClients, useCreateClient, useUpdateClient, useDeleteClient, useRegions } from "@/lib/supabase-realtime-hooks"
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 
@@ -62,6 +62,7 @@ interface Region {
 function ClientsPage() {
   const { user } = useAuth()
   const { data: clients = [], isLoading: loading, error } = useClients()
+  const { data: regions = [] } = useRegions()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -99,8 +100,8 @@ function ClientsPage() {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.name || !formData.phone || !formData.city || !formData.supervisor_id) {
-      showEditErrorToast('Client', 'Please fill all required fields (Name, Phone, City, and Supervisor)')
+    if (!formData.name || !formData.phone || !formData.address || !formData.region_id) {
+      showEditErrorToast('Client', 'Please fill all required fields (Name, Phone, Address, and Region)')
       return
     }
 
@@ -110,8 +111,6 @@ function ClientsPage() {
         phone: formData.phone,
         address: formData.address,
         rc_number: formData.rc_number,
-        city: formData.city,
-        supervisor_id: formData.supervisor_id,
         region_id: formData.region_id,
         contact_person: formData.contact_person,
         status: formData.status
@@ -122,7 +121,7 @@ function ClientsPage() {
       showEditSuccessToast('Client', formData.name)
     } catch (error) {
       console.error("Failed to create client:", error)
-      showEditErrorToast('Client', 'Failed to create client')
+      showEditErrorToast('Client', error instanceof Error ? error.message : 'Failed to create client')
     }
   }
 
@@ -459,17 +458,25 @@ function ClientsPage() {
                         </div>
 
                         <div>
-                          <Label htmlFor="city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                            <Building className="h-4 w-4 text-blue-600" />
-                            City <span className="text-red-500">*</span>
+                          <Label htmlFor="region_id" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-blue-600" />
+                            Region <span className="text-red-500">*</span>
                           </Label>
-                          <Input
-                            id="city"
-                            value={formData.city}
-                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                            className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                            placeholder="Enter city"
-                          />
+                          <Select
+                            value={formData.region_id}
+                            onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                          >
+                            <SelectTrigger className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                              <SelectValue placeholder="Select region" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {regions.map((region) => (
+                                <SelectItem key={region.id} value={region.id}>
+                                  {region.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         <div>
@@ -483,6 +490,20 @@ function ClientsPage() {
                             onChange={(e) => setFormData({ ...formData, rc_number: e.target.value })}
                             className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                             placeholder="Enter RC number"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <Building className="h-4 w-4 text-blue-600" />
+                            City
+                          </Label>
+                          <Input
+                            id="city"
+                            value={formData.city}
+                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                            className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                            placeholder="Enter city"
                           />
                         </div>
 
@@ -523,14 +544,14 @@ function ClientsPage() {
                       <div>
                         <Label htmlFor="address" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-blue-600" />
-                          Address
+                          Address <span className="text-red-500">*</span>
                         </Label>
                         <Textarea
                           id="address"
                           value={formData.address}
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                           className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                          placeholder="Enter full address"
+                          placeholder="Enter full address (street, city, etc.)"
                           rows={3}
                         />
                       </div>

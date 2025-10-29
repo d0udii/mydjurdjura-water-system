@@ -341,14 +341,40 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: async (clientData: any) => {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert([clientData])
-        .select()
-        .single()
+      // Transform form data to API format
+      const apiData = {
+        name: clientData.name,
+        phone: clientData.phone,
+        address: clientData.address || (clientData.city ? `${clientData.city}, ${clientData.address || ''}`.trim() : ''),
+        region_id: clientData.region_id,
+        contact_person: clientData.contact_person || '',
+        rc_number: clientData.rc_number || '',
+        status: clientData.status || 'active'
+      }
 
-      if (error) throw error
-      return data
+      if (!apiData.region_id) {
+        throw new Error('Region is required')
+      }
+
+      if (!apiData.address) {
+        throw new Error('Address is required')
+      }
+
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Failed to create client')
+      }
+
+      const result = await response.json()
+      return result.data?.client || result
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients })
