@@ -13,21 +13,24 @@ import { Crown, Shield, Zap, Lock, Truck, Edit, Trash2, Plus, CheckCircle, XCirc
 import { useAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/auth"
 import { showEditSuccessToast, showEditErrorToast, showDeleteSuccessToast, showDeleteErrorToast } from "@/lib/toast-notifications"
-import { useTransportTariffs, useCreateTransportTariff, useUpdateTransportTariff, useDeleteTransportTariff } from "@/lib/supabase-realtime-hooks"
+import { useTransportTariffs, useCreateTransportTariff, useUpdateTransportTariff, useDeleteTransportTariff, useRegions } from "@/lib/supabase-realtime-hooks"
 import { FormInput, FormSelect, FormButton, FormLayout, FormActions } from "@/components/ui/form-components"
 import { FormValidator } from "@/lib/form-validation"
 
 interface TransportTariff {
   id: string
   city: string
-  cost_per_pallet: number
-  status: 'active' | 'inactive'
+  price: number
+  driver_type: 'factory' | 'local'
+  region_id: string
   created_at: string
+  updated_at: string
 }
 
 function TransportPage() {
   const { user } = useAuth()
   const { data: tariffs = [], isLoading: loading, error } = useTransportTariffs()
+  const { data: regions = [] } = useRegions()
   const createTariff = useCreateTransportTariff()
   const updateTariff = useUpdateTransportTariff()
   const deleteTariff = useDeleteTransportTariff()
@@ -37,14 +40,16 @@ function TransportPage() {
   const [selectedTariff, setSelectedTariff] = useState<TransportTariff | null>(null)
   const [editForm, setEditForm] = useState({
     city: '',
-    cost_per_pallet: 0,
-    status: 'active' as 'active' | 'inactive'
+    price: 0,
+    driver_type: 'local' as 'factory' | 'local',
+    region_id: ''
   })
   const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   const [addForm, setAddForm] = useState({
     city: '',
-    cost_per_pallet: 0,
-    status: 'active' as 'active' | 'inactive'
+    price: 0,
+    driver_type: 'local' as 'factory' | 'local',
+    region_id: ''
   })
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   
@@ -54,7 +59,8 @@ function TransportPage() {
   const validateAddForm = (): boolean => {
     const validationRules = {
       city: FormValidator.rules.required('City'),
-      cost_per_pallet: FormValidator.rules.positiveNumber('Cost per Pallet')
+      price: FormValidator.rules.positiveNumber('Delivery Price'),
+      region_id: FormValidator.rules.required('Region')
     }
     const result = FormValidator.validateForm(addForm, validationRules)
     setAddErrors(result.errors)
@@ -64,7 +70,8 @@ function TransportPage() {
   const validateEditForm = (): boolean => {
     const validationRules = {
       city: FormValidator.rules.required('City'),
-      cost_per_pallet: FormValidator.rules.positiveNumber('Cost per Pallet')
+      price: FormValidator.rules.positiveNumber('Delivery Price'),
+      region_id: FormValidator.rules.required('Region')
     }
     const result = FormValidator.validateForm(editForm, validationRules)
     setEditErrors(result.errors)
@@ -74,8 +81,9 @@ function TransportPage() {
   const handleAddTariff = () => {
     setAddForm({
       city: '',
-      cost_per_pallet: 0,
-      status: 'active'
+      price: 0,
+      driver_type: 'local',
+      region_id: ''
     })
     setIsAddDialogOpen(true)
   }
@@ -109,8 +117,9 @@ function TransportPage() {
     setSelectedTariff(tariffToEdit)
     setEditForm({
       city: tariffToEdit.city,
-      cost_per_pallet: tariffToEdit.cost_per_pallet,
-      status: tariffToEdit.status
+      price: tariffToEdit.price,
+      driver_type: tariffToEdit.driver_type,
+      region_id: tariffToEdit.region_id
     })
     setIsEditDialogOpen(true)
   }
@@ -226,19 +235,17 @@ function TransportPage() {
                     <h3 className="font-semibold text-lg">{tariff.city}</h3>
                     <Truck className="h-5 w-5 text-blue-500" />
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Transport cost per pallet</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Fixed delivery cost (full truck)</p>
+                  <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 mt-2">
+                    {tariff.driver_type === 'factory' ? 'Factory' : 'Local'} Driver
+                  </Badge>
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                     Created: {new Date(tariff.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <Badge className={tariff.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'}>
-                      {tariff.status === 'active' && <CheckCircle className="h-3 w-3 mr-1" />}
-                      {tariff.status === 'inactive' && <XCircle className="h-3 w-3 mr-1" />}
-                      {tariff.status.toUpperCase()}
-                    </Badge>
-                    <span className="font-semibold text-lg">{tariff.cost_per_pallet.toLocaleString()} DA</span>
+                    <span className="font-semibold text-lg text-green-600">{tariff.price.toLocaleString()} DA</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -318,29 +325,40 @@ function TransportPage() {
               error={addErrors.city}
               value={addForm.city}
               onChange={(e) => setAddForm({ ...addForm, city: e.target.value })}
-              placeholder="Enter city name"
+              placeholder="Enter city name (e.g., Biskra)"
             />
             <FormInput
-              label="Cost per Pallet (DA)"
-              name="add-cost_per_pallet"
+              label="Fixed Delivery Price (DA)"
+              name="add-price"
               type="number"
               step="0.01"
               required
-              error={addErrors.cost_per_pallet}
-              value={addForm.cost_per_pallet}
-              onChange={(e) => setAddForm({ ...addForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
-              placeholder="Enter cost per pallet"
+              error={addErrors.price}
+              value={addForm.price}
+              onChange={(e) => setAddForm({ ...addForm, price: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter full truck price (e.g., 31000)"
             />
             <FormSelect
-              label="Status"
-              name="add-status"
-              value={addForm.status}
-              onValueChange={(value: 'active' | 'inactive') => setAddForm({ ...addForm, status: value })}
+              label="Driver Type"
+              name="add-driver_type"
+              required
+              value={addForm.driver_type}
+              onValueChange={(value: 'factory' | 'local') => setAddForm({ ...addForm, driver_type: value })}
               options={[
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                { value: 'factory', label: 'Factory Driver' },
+                { value: 'local', label: 'Local Driver' }
               ]}
-              placeholder="Select status"
+              placeholder="Select driver type"
+            />
+            <FormSelect
+              label="Region"
+              name="add-region_id"
+              required
+              error={addErrors.region_id}
+              value={addForm.region_id}
+              onValueChange={(value: string) => setAddForm({ ...addForm, region_id: value })}
+              options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
+              placeholder="Select region"
             />
             <FormActions>
               <FormButton 
@@ -382,29 +400,40 @@ function TransportPage() {
               error={editErrors.city}
               value={editForm.city}
               onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-              placeholder="Enter city name"
+              placeholder="Enter city name (e.g., Biskra)"
             />
             <FormInput
-              label="Cost per Pallet (DA)"
-              name="cost_per_pallet"
+              label="Fixed Delivery Price (DA)"
+              name="price"
               type="number"
               step="0.01"
               required
-              error={editErrors.cost_per_pallet}
-              value={editForm.cost_per_pallet}
-              onChange={(e) => setEditForm({ ...editForm, cost_per_pallet: parseFloat(e.target.value) || 0 })}
-              placeholder="Enter cost per pallet"
+              error={editErrors.price}
+              value={editForm.price}
+              onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
+              placeholder="Enter full truck price (e.g., 31000)"
             />
             <FormSelect
-              label="Status"
-              name="status"
-              value={editForm.status}
-              onValueChange={(value: 'active' | 'inactive') => setEditForm({ ...editForm, status: value })}
+              label="Driver Type"
+              name="driver_type"
+              required
+              value={editForm.driver_type}
+              onValueChange={(value: 'factory' | 'local') => setEditForm({ ...editForm, driver_type: value })}
               options={[
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                { value: 'factory', label: 'Factory Driver' },
+                { value: 'local', label: 'Local Driver' }
               ]}
-              placeholder="Select status"
+              placeholder="Select driver type"
+            />
+            <FormSelect
+              label="Region"
+              name="region_id"
+              required
+              error={editErrors.region_id}
+              value={editForm.region_id}
+              onValueChange={(value: string) => setEditForm({ ...editForm, region_id: value })}
+              options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
+              placeholder="Select region"
             />
             <FormActions>
               <FormButton 
