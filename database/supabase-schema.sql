@@ -306,7 +306,7 @@ INSERT INTO users (id, name, email, role, region_id, status) VALUES
     ('550e8400-e29b-41d4-a716-446655440012', 'Mahmoud Djouadi', 'mahmoud@djurdjura.dz', 'supervisor', '550e8400-e29b-41d4-a716-446655440001', 'active'),
     ('550e8400-e29b-41d4-a716-446655440013', 'Chef Région Ouest', 'chef.ouest@djurdjura.dz', 'regional_manager', '550e8400-e29b-41d4-a716-446655440002', 'active'),
     ('550e8400-e29b-41d4-a716-446655440014', 'Operations Team', 'operations@djurdjura.dz', 'operations', NULL, 'active')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO products (id, name, volume, units_per_pallet, unit_price, status) VALUES 
     ('550e8400-e29b-41d4-a716-446655440020', '5.5L Djurdjura Water', '5.5L', 212, 65.00, 'active'),
