@@ -3,7 +3,7 @@
  * Validates user authentication and role-based permissions
  */
 
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { ApiResponseHelper } from './api-response'
 import { supabaseAdmin } from './supabase'
 
