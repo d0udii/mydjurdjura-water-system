@@ -11,50 +11,75 @@
 -- DELETE FROM activity_logs;
 
 -- Insert additional regions
-INSERT INTO regions (id, name, responsible, created_at, updated_at) VALUES
-('region-2', 'Tizi Ouzou', 'Ahmed Benali', NOW(), NOW()),
-('region-3', 'Bejaia', 'Fatima Zohra', NOW(), NOW()),
-('region-4', 'Boumerdes', 'Omar Khelil', NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO regions (name, description) VALUES
+('Tizi Ouzou', 'Tizi Ouzou region - Managed by Ahmed Benali'),
+('Bejaia', 'Bejaia region - Managed by Fatima Zohra'),
+('Boumerdes', 'Boumerdes region - Managed by Omar Khelil')
+ON CONFLICT (name) DO NOTHING;
 
 -- Insert additional products
-INSERT INTO products (id, name, volume, units_per_pallet, unit_price, created_at, updated_at) VALUES
-('prod-2', 'Water Bottle 1.5L', 1.5, 24, 25.00, NOW(), NOW()),
-('prod-3', 'Water Bottle 0.5L', 0.5, 48, 15.00, NOW(), NOW()),
-('prod-4', 'Water Jug 5L', 5.0, 4, 75.00, NOW(), NOW()),
-('prod-5', 'Water Jug 10L', 10.0, 2, 120.00, NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO products (name, volume, units_per_pallet, unit_price) VALUES
+('Water Bottle 1.5L', '1.5L', 24, 25.00),
+('Water Bottle 0.5L', '0.5L', 48, 15.00),
+('Water Jug 5L', '5L', 4, 75.00),
+('Water Jug 10L', '10L', 2, 120.00)
+ON CONFLICT (name) DO NOTHING;
 
 -- Insert additional transport tariffs
-INSERT INTO transport_tariffs (id, city, price, region_id, created_at, updated_at) VALUES
-('tariff-2', 'Tizi Ouzou', 150.00, 'region-2', NOW(), NOW()),
-('tariff-3', 'Bejaia', 200.00, 'region-3', NOW(), NOW()),
-('tariff-4', 'Boumerdes', 120.00, 'region-4', NOW(), NOW()),
-('tariff-5', 'Azazga', 180.00, 'region-1', NOW(), NOW()),
-('tariff-6', 'Mekla', 160.00, 'region-1', NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+-- First, get region IDs dynamically
+INSERT INTO transport_tariffs (city, price, driver_type, region_id)
+SELECT 'Tizi Ouzou', 150.00, 'local', id FROM regions WHERE name = 'Tizi Ouzou'
+ON CONFLICT DO NOTHING;
 
--- Insert additional clients
-INSERT INTO clients (id, name, phone, address, region_id, contact_person, rc_number, status, created_at, updated_at) VALUES
-('client-2', 'Restaurant Le Palmier', '+213 555 123 456', '123 Avenue de la République, Tizi Ouzou', 'region-2', 'Mohamed Boudiaf', 'RC123456789', 'active', NOW(), NOW()),
-('client-3', 'Hotel Les Pins', '+213 555 234 567', '456 Boulevard de l''Indépendance, Bejaia', 'region-3', 'Aicha Benali', 'RC234567890', 'active', NOW(), NOW()),
-('client-4', 'Café Central', '+213 555 345 678', '789 Rue de la Paix, Boumerdes', 'region-4', 'Karim Ouali', 'RC345678901', 'active', NOW(), NOW()),
-('client-5', 'Boulangerie Moderne', '+213 555 456 789', '321 Place du Marché, Tizi Ouzou', 'region-2', 'Fatima Zohra', 'RC456789012', 'active', NOW(), NOW()),
-('client-6', 'Supermarket Express', '+213 555 567 890', '654 Avenue des Martyrs, Bejaia', 'region-3', 'Omar Khelil', 'RC567890123', 'active', NOW(), NOW()),
-('client-7', 'Restaurant El Djurdjura', '+213 555 678 901', '987 Rue de la Liberté, Boumerdes', 'region-4', 'Nadia Cherif', 'RC678901234', 'active', NOW(), NOW()),
-('client-8', 'Café des Amis', '+213 555 789 012', '147 Avenue de l''Armée, Tizi Ouzou', 'region-2', 'Ahmed Benali', 'RC789012345', 'active', NOW(), NOW()),
-('client-9', 'Hotel Kabylie', '+213 555 890 123', '258 Boulevard de la Révolution, Bejaia', 'region-3', 'Yasmine Boudiaf', 'RC890123456', 'active', NOW(), NOW()),
-('client-10', 'Boulangerie du Centre', '+213 555 901 234', '369 Place de la République, Boumerdes', 'region-4', 'Hakim Ouali', 'RC901234567', 'active', NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO transport_tariffs (city, price, driver_type, region_id)
+SELECT 'Bejaia', 200.00, 'local', id FROM regions WHERE name = 'Bejaia'
+ON CONFLICT DO NOTHING;
 
--- Insert additional users
-INSERT INTO users (id, name, email, password, role, region_id, status, approved, created_at, updated_at) VALUES
-('user-2', 'Ahmed Benali', 'ahmed.benali@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', 'region-2', 'active', true, NOW(), NOW()),
-('user-3', 'Fatima Zohra', 'fatima.zohra@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', 'region-3', 'active', true, NOW(), NOW()),
-('user-4', 'Omar Khelil', 'omar.khelil@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', 'region-4', 'active', true, NOW(), NOW()),
-('user-5', 'Nadia Cherif', 'nadia.cherif@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'operations', 'region-1', 'active', true, NOW(), NOW()),
-('user-6', 'Karim Ouali', 'karim.ouali@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'operations', 'region-2', 'active', true, NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO transport_tariffs (city, price, driver_type, region_id)
+SELECT 'Boumerdes', 120.00, 'local', id FROM regions WHERE name = 'Boumerdes'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO transport_tariffs (city, price, driver_type, region_id)
+SELECT 'Azazga', 180.00, 'factory', id FROM regions WHERE name = 'Djurdjura'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO transport_tariffs (city, price, driver_type, region_id)
+SELECT 'Mekla', 160.00, 'factory', id FROM regions WHERE name = 'Djurdjura'
+ON CONFLICT DO NOTHING;
+
+-- Insert additional clients using dynamic region IDs
+INSERT INTO clients (name, phone, address, region_id, contact_person, status)
+SELECT 'Restaurant Le Palmier', '+213 555 123 456', '123 Avenue de la République, Tizi Ouzou', id, 'Mohamed Boudiaf', 'active'
+FROM regions WHERE name = 'Tizi Ouzou';
+
+INSERT INTO clients (name, phone, address, region_id, contact_person, status)
+SELECT 'Hotel Les Pins', '+213 555 234 567', '456 Boulevard de l''Indépendance, Bejaia', id, 'Aicha Benali', 'active'
+FROM regions WHERE name = 'Bejaia';
+
+INSERT INTO clients (name, phone, address, region_id, contact_person, status)
+SELECT 'Café Central', '+213 555 345 678', '789 Rue de la Paix, Boumerdes', id, 'Karim Ouali', 'active'
+FROM regions WHERE name = 'Boumerdes';
+
+INSERT INTO clients (name, phone, address, region_id, contact_person, status)
+SELECT 'Boulangerie Moderne', '+213 555 456 789', '321 Place du Marché, Tizi Ouzou', id, 'Fatima Zohra', 'active'
+FROM regions WHERE name = 'Tizi Ouzou';
+
+INSERT INTO clients (name, phone, address, region_id, contact_person, status)
+SELECT 'Supermarket Express', '+213 555 567 890', '654 Avenue des Martyrs, Bejaia', id, 'Omar Khelil', 'active'
+FROM regions WHERE name = 'Bejaia';
+
+-- Insert additional users using dynamic region IDs
+INSERT INTO users (name, email, password_hash, role, region_id, status)
+SELECT 'Ahmed Benali', 'ahmed.benali@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
+FROM regions WHERE name = 'Tizi Ouzou';
+
+INSERT INTO users (name, email, password_hash, role, region_id, status)
+SELECT 'Fatima Zohra', 'fatima.zohra@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
+FROM regions WHERE name = 'Bejaia';
+
+INSERT INTO users (name, email, password_hash, role, region_id, status)
+SELECT 'Omar Khelil', 'omar.khelil@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
+FROM regions WHERE name = 'Boumerdes';
 
 -- Insert BL numbers
 INSERT INTO bl_numbers (id, bl_number, order_id, status, created_at, updated_at) VALUES
