@@ -146,8 +146,8 @@ function ClientsPage() {
 
     if (!selectedClient) return
 
-    if (!formData.name || !formData.phone || !formData.city) {
-      showEditErrorToast('Client', 'Please fill all required fields (Name, Phone, City)')
+    if (!formData.name || !formData.phone || !formData.address || !formData.region_id) {
+      showEditErrorToast('Client', 'Please fill all required fields (Name, Phone, Address, and Region)')
       return
     }
 
@@ -158,7 +158,6 @@ function ClientsPage() {
         phone: selectedClient.phone,
         address: selectedClient.address,
         rc_number: selectedClient.rc_number || "",
-        city: selectedClient.address.split(',')[1]?.trim() || "",
         region_id: selectedClient.region_id,
         contact_person: selectedClient.contact_person || "",
         status: selectedClient.status
@@ -170,7 +169,6 @@ function ClientsPage() {
         phone: formData.phone,
         address: formData.address,
         rc_number: formData.rc_number,
-        city: formData.city,
         region_id: formData.region_id,
         contact_person: formData.contact_person,
         status: formData.status
@@ -786,17 +784,25 @@ function ClientsPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="edit-city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <Building className="h-4 w-4 text-blue-600" />
-                    City <span className="text-red-500">*</span>
+                  <Label htmlFor="edit-region" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-blue-600" />
+                    Region <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="edit-city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                    placeholder="Enter city"
-                  />
+                  <Select
+                    value={formData.region_id}
+                    onValueChange={(value) => setFormData({ ...formData, region_id: value })}
+                  >
+                    <SelectTrigger className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region.id} value={region.id}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -810,6 +816,20 @@ function ClientsPage() {
                     onChange={(e) => setFormData({ ...formData, rc_number: e.target.value })}
                     className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                     placeholder="Enter RC number"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-city" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <Building className="h-4 w-4 text-blue-600" />
+                    City
+                  </Label>
+                  <Input
+                    id="edit-city"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="h-12 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                    placeholder="Enter city"
                   />
                 </div>
 
@@ -850,17 +870,17 @@ function ClientsPage() {
               <div>
                 <Label htmlFor="edit-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-blue-600" />
-                  Address
+                  Address <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="edit-address"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                  placeholder="Enter full address"
+                  placeholder="Enter full address (street, city, etc.)"
                   rows={3}
                 />
-                </div>
+              </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <Button
