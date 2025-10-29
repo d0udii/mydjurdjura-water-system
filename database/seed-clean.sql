@@ -114,24 +114,24 @@ FROM regions
 WHERE name = 'Bejaia'
 AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Restaurant El Firdaous');
 
--- Insert users
+-- Insert users (with ON CONFLICT to handle existing users gracefully)
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Ahmed Benali', 'ahmed.benali@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
 FROM regions 
 WHERE name = 'Tizi Ouzou'
-AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'ahmed.benali@djurdjura.dz');
+ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Fatima Zohra', 'fatima.zohra@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
 FROM regions 
 WHERE name = 'Bejaia'
-AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'fatima.zohra@djurdjura.dz');
+ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Omar Khelil', 'omar.khelil@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
 FROM regions 
 WHERE name = 'Boumerdes'
-AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'omar.khelil@djurdjura.dz');
+ON CONFLICT (email) DO NOTHING;
 
 -- Re-enable user-created triggers after seeding
 ALTER TABLE users ENABLE TRIGGER USER;
