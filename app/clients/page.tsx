@@ -84,12 +84,31 @@ function ClientsPage() {
     status: "active" as 'active' | 'inactive'
   })
 
+  // Debug: Log transport tariffs
+  useEffect(() => {
+    console.log('🚚 Transport Tariffs loaded:', transportTariffs)
+    console.log('🚚 Transport Tariffs count:', (transportTariffs as any[])?.length || 0)
+  }, [transportTariffs])
+
   // Get unique cities from transport tariffs
-  const uniqueCities = Array.from(
-    new Map(
-      (transportTariffs as any[]).map((tariff: any) => [tariff.city, { city: tariff.city, region_id: tariff.region_id }])
-    ).values()
-  ).sort((a: any, b: any) => a.city.localeCompare(b.city))
+  const uniqueCities = React.useMemo(() => {
+    if (!transportTariffs || (transportTariffs as any[]).length === 0) {
+      console.log('⚠️ No transport tariffs available')
+      return []
+    }
+    
+    const cities = Array.from(
+      new Map(
+        (transportTariffs as any[]).map((tariff: any) => [
+          tariff.city, 
+          { city: tariff.city, region_id: tariff.region_id }
+        ])
+      ).values()
+    ).sort((a: any, b: any) => a.city.localeCompare(b.city))
+    
+    console.log('🏙️ Unique cities:', cities)
+    return cities
+  }, [transportTariffs])
 
   // Handle city selection - auto-populate region
   const handleCityChange = (city: string) => {
@@ -486,11 +505,17 @@ function ClientsPage() {
                               <SelectValue placeholder="Select city (region auto-fills)" />
                             </SelectTrigger>
                             <SelectContent>
-                              {uniqueCities.map((item) => (
-                                <SelectItem key={item.city} value={item.city}>
-                                  {item.city}
-                                </SelectItem>
-                              ))}
+                              {uniqueCities.length === 0 ? (
+                                <div className="px-2 py-4 text-sm text-gray-500">
+                                  No cities available. Add transport tariffs first.
+                                </div>
+                              ) : (
+                                uniqueCities.map((item: any) => (
+                                  <SelectItem key={item.city} value={item.city}>
+                                    {item.city}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           {formData.region_id && (
@@ -805,11 +830,17 @@ function ClientsPage() {
                       <SelectValue placeholder="Select city (region auto-fills)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueCities.map((item) => (
-                        <SelectItem key={item.city} value={item.city}>
-                          {item.city}
-                        </SelectItem>
-                      ))}
+                      {uniqueCities.length === 0 ? (
+                        <div className="px-2 py-4 text-sm text-gray-500">
+                          No cities available. Add transport tariffs first.
+                        </div>
+                      ) : (
+                        uniqueCities.map((item: any) => (
+                          <SelectItem key={item.city} value={item.city}>
+                            {item.city}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   {formData.region_id && (
