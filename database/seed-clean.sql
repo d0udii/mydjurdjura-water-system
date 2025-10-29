@@ -1,6 +1,14 @@
 -- Clean Seed Data for Djurdjura Water System
 -- This script only includes data that can be safely inserted without hardcoded IDs
 
+-- Temporarily disable activity log triggers to avoid errors during seeding
+ALTER TABLE users DISABLE TRIGGER ALL;
+ALTER TABLE regions DISABLE TRIGGER ALL;
+ALTER TABLE products DISABLE TRIGGER ALL;
+ALTER TABLE transport_tariffs DISABLE TRIGGER ALL;
+ALTER TABLE clients DISABLE TRIGGER ALL;
+ALTER TABLE orders DISABLE TRIGGER ALL;
+
 -- Insert additional regions
 INSERT INTO regions (name, description)
 SELECT 'Tizi Ouzou', 'Tizi Ouzou region - Managed by Ahmed Benali'
@@ -123,6 +131,14 @@ SELECT 'Omar Khelil', 'omar.khelil@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6u
 FROM regions 
 WHERE name = 'Boumerdes'
 AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'omar.khelil@djurdjura.dz');
+
+-- Re-enable triggers after seeding
+ALTER TABLE users ENABLE TRIGGER ALL;
+ALTER TABLE regions ENABLE TRIGGER ALL;
+ALTER TABLE products ENABLE TRIGGER ALL;
+ALTER TABLE transport_tariffs ENABLE TRIGGER ALL;
+ALTER TABLE clients ENABLE TRIGGER ALL;
+ALTER TABLE orders ENABLE TRIGGER ALL;
 
 -- Verify data insertion
 SELECT 'Regions' as table_name, COUNT(*) as count FROM regions
