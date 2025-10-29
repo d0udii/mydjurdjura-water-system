@@ -300,13 +300,50 @@ INSERT INTO regions (id, name, description) VALUES
     ('550e8400-e29b-41d4-a716-446655440003', 'Center', 'Central region of Algeria')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO users (id, name, email, role, region_id, status) VALUES 
-    ('550e8400-e29b-41d4-a716-446655440010', 'Admin Djurdjura', 'admin@djurdjura.dz', 'admin', NULL, 'active'),
-    ('550e8400-e29b-41d4-a716-446655440011', 'Hamouch', 'hamouch@djurdjura.dz', 'regional_manager', '550e8400-e29b-41d4-a716-446655440001', 'active'),
-    ('550e8400-e29b-41d4-a716-446655440012', 'Mahmoud Djouadi', 'mahmoud@djurdjura.dz', 'supervisor', '550e8400-e29b-41d4-a716-446655440001', 'active'),
-    ('550e8400-e29b-41d4-a716-446655440013', 'Chef Région Ouest', 'chef.ouest@djurdjura.dz', 'regional_manager', '550e8400-e29b-41d4-a716-446655440002', 'active'),
-    ('550e8400-e29b-41d4-a716-446655440014', 'Operations Team', 'operations@djurdjura.dz', 'operations', NULL, 'active')
-ON CONFLICT (email) DO NOTHING;
+-- Insert initial users (handle conflicts on both id and email using exception handling)
+DO $$
+BEGIN
+    -- Insert users one by one with exception handling
+    BEGIN
+        INSERT INTO users (id, name, email, role, region_id, status) VALUES 
+            ('550e8400-e29b-41d4-a716-446655440010', 'Admin Djurdjura', 'admin@djurdjura.dz', 'admin', NULL, 'active')
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN unique_violation THEN
+        NULL; -- Ignore conflicts
+    END;
+    
+    BEGIN
+        INSERT INTO users (id, name, email, role, region_id, status) VALUES 
+            ('550e8400-e29b-41d4-a716-446655440011', 'Hamouch', 'hamouch@djurdjura.dz', 'regional_manager', '550e8400-e29b-41d4-a716-446655440001', 'active')
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN unique_violation THEN
+        NULL;
+    END;
+    
+    BEGIN
+        INSERT INTO users (id, name, email, role, region_id, status) VALUES 
+            ('550e8400-e29b-41d4-a716-446655440012', 'Mahmoud Djouadi', 'mahmoud@djurdjura.dz', 'supervisor', '550e8400-e29b-41d4-a716-446655440001', 'active')
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN unique_violation THEN
+        NULL;
+    END;
+    
+    BEGIN
+        INSERT INTO users (id, name, email, role, region_id, status) VALUES 
+            ('550e8400-e29b-41d4-a716-446655440013', 'Chef Région Ouest', 'chef.ouest@djurdjura.dz', 'regional_manager', '550e8400-e29b-41d4-a716-446655440002', 'active')
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN unique_violation THEN
+        NULL;
+    END;
+    
+    BEGIN
+        INSERT INTO users (id, name, email, role, region_id, status) VALUES 
+            ('550e8400-e29b-41d4-a716-446655440014', 'Operations Team', 'operations@djurdjura.dz', 'operations', NULL, 'active')
+        ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN unique_violation THEN
+        NULL;
+    END;
+END $$;
 
 INSERT INTO products (id, name, volume, units_per_pallet, unit_price, status) VALUES 
     ('550e8400-e29b-41d4-a716-446655440020', '5.5L Djurdjura Water', '5.5L', 212, 65.00, 'active'),
