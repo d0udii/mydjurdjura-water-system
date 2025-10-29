@@ -8,6 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useEffect } from 'react'
+import { useAuth } from '@/lib/auth'
 import { 
   showClientSuccessToast, 
   showClientErrorToast,
