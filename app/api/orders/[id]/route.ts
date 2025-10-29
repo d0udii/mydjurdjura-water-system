@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOrderById, updateOrder as updateSharedOrder, getAllOrders } from '@/lib/shared-api-data'
+import { getOrderById, updateOrder } from '@/lib/supabase-db'
 
 // Mock notifications storage
 let notifications: any[] = []
@@ -141,13 +141,13 @@ function createOrderEditNotification(orderData: any, supervisorId: string, edite
   return supervisorNotification
 }
 
-// Helper functions
-function getOrderByIdLocal(id: string) {
-  return getOrderById(id)
+// Helper functions (now async)
+async function getOrderByIdLocal(id: string) {
+  return await getOrderById(id)
 }
 
-function updateOrderLocal(id: string, updatedOrder: any) {
-  updateSharedOrder(id, updatedOrder)
+async function updateOrderLocal(id: string, updatedOrder: any) {
+  return await updateOrder(id, updatedOrder)
 }
 
 export async function DELETE(
@@ -158,7 +158,7 @@ export async function DELETE(
     const { id } = await params
     const { user_role, user_id } = await request.json().catch(() => ({}))
     
-    const order = getOrderByIdLocal(id)
+    const order = await getOrderByIdLocal(id)
 
     if (!order) {
       return NextResponse.json(
@@ -184,7 +184,7 @@ export async function DELETE(
       updated_at: new Date().toISOString()
     }
 
-    updateOrder(id, deletedOrder)
+    await updateOrder(id, deletedOrder)
 
     // Create notification for supervisor
     const supervisorNotification = {
@@ -219,7 +219,7 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     const { action, bl_number, approved_by } = body
-    const order = getOrderByIdLocal(id)
+    const order = await getOrderByIdLocal(id)
 
     if (!order) {
       return NextResponse.json(
@@ -242,7 +242,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      updateOrderLocal(id, updatedOrder)
+      await updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderApprovalNotification(order, order.created_by, generatedBlNumber)
@@ -266,7 +266,7 @@ export async function PATCH(
         rejection_reason: rejection_reason || 'Order rejected by operations team'
       }
 
-      updateOrderLocal(id, updatedOrder)
+      await updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderRejectionNotification(order, order.created_by, rejection_reason)
@@ -296,7 +296,7 @@ export async function PATCH(
         bl_updated_at: new Date().toISOString()
       }
 
-      updateOrderLocal(id, updatedOrder)
+      await updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createBLNumberUpdateNotification(order, order.created_by, bl_number)
@@ -322,7 +322,7 @@ export async function PATCH(
         updated_at: new Date().toISOString()
       }
 
-      updateOrderLocal(id, updatedOrder)
+      await updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, order.status, tracking_info)
@@ -353,7 +353,7 @@ export async function PATCH(
         status_updated_at: new Date().toISOString()
       }
 
-      updateOrderLocal(id, updatedOrder)
+      await updateOrderLocal(id, updatedOrder)
 
       // Create notification for supervisor
       const supervisorNotification = createOrderStatusUpdateNotification(order, order.created_by, status)

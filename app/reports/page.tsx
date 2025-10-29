@@ -45,7 +45,7 @@ import {
   XCircle,
   AlertTriangle
 } from "lucide-react"
-import { useDataStore } from "@/lib/shared-data-store"
+import { useDataStore } from "@/lib/supabase-data-store"
 import { format } from "date-fns"
 import { ExportButton } from "@/components/export-utils"
 import { AdvancedAnalytics } from "@/components/advanced-analytics"

@@ -33,7 +33,7 @@ import {
   RevealTableRow,
   ShakeElement
 } from "@/components/animations"
-import { useDataStore } from "@/lib/shared-data-store"
+import { useDataStore } from "@/lib/supabase-data-store"
 import { useAuth, withAuth } from "@/lib/auth"
 
 // Loading Spinner Component

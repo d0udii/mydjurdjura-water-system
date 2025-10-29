@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllOrders } from '@/lib/shared-api-data'
+import { getOrders } from '@/lib/supabase-db'
 
 // Mock pallet tracking storage (in production, this would be in Supabase)
 let palletTracking: any[] = [
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate that order exists and get client_id if not provided
-    const orders = getAllOrders()
+    const orders = await getOrders()
     const order = orders.find(o => o.id === order_id)
     
     if (!order) {
