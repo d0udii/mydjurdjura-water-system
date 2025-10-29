@@ -293,15 +293,36 @@ export function useUpdateOrder() {
 
 export function useDeleteClient() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id)
+      // Prepare headers with authentication
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
 
-      if (error) throw error
+      // Add auth headers if user is available
+      if (user) {
+        headers['x-user-id'] = user.id
+        headers['x-user-email'] = user.email || ''
+        headers['x-user-role'] = user.role || 'operations'
+        headers['x-user-region-id'] = user.region_id || ''
+        headers['x-user-status'] = user.status || 'active'
+      }
+
+      const response = await fetch(`/api/clients/${id}`, {
+        method: 'DELETE',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Failed to delete client')
+      }
+
+      const result = await response.json()
+      return result
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients })
@@ -403,18 +424,37 @@ export function useCreateClient() {
 
 export function useUpdateClient() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
-      const { data, error } = await supabase
-        .from('clients')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      // Prepare headers with authentication
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
 
-      if (error) throw error
-      return data
+      // Add auth headers if user is available
+      if (user) {
+        headers['x-user-id'] = user.id
+        headers['x-user-email'] = user.email || ''
+        headers['x-user-role'] = user.role || 'operations'
+        headers['x-user-region-id'] = user.region_id || ''
+        headers['x-user-status'] = user.status || 'active'
+      }
+
+      const response = await fetch(`/api/clients/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || errorData.error || 'Failed to update client')
+      }
+
+      const result = await response.json()
+      return result.data?.client || result
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients })
