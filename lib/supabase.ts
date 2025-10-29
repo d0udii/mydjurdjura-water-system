@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { createBrowserClient } from '@supabase/ssr'
 
 // Fallback values for development when env vars are not set
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlbW8iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NTQ2NzIwMCwiZXhwIjoxOTYxMDQzMjAwfQ.demo-key'
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co').trim()
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlbW8iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NTQ2NzIwMCwiZXhwIjoxOTYxMDQzMjAwfQ.demo-key').trim().replace(/\r?\n/g, '')
 
 // Only create clients if we have valid URLs
 let supabase: any = null
@@ -14,9 +14,10 @@ if (supabaseUrl && supabaseUrl !== 'https://demo.supabase.co') {
   supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
   // Admin client for server-side operations (with service role key)
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || 'demo-service-key').trim().replace(/\r?\n/g, '')
   supabaseAdmin = createClient(
     supabaseUrl,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 'demo-service-key',
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,

@@ -287,3 +287,12 @@ export const showNotificationErrorToast = (action: 'create' | 'update' | 'delete
       break
   }
 }
+
+// Alias functions for backward compatibility (showEditSuccessToast, showEditErrorToast)
+export const showEditSuccessToast = (entity: string, details?: string) => {
+  showUpdateSuccessToast(entity, details ? { description: details } : undefined)
+}
+
+export const showEditErrorToast = (entity: string, error?: any) => {
+  showUpdateErrorToast(entity, error)
+}
