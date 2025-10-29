@@ -18,68 +18,103 @@ INSERT INTO regions (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Insert additional products
-INSERT INTO products (name, volume, units_per_pallet, unit_price) VALUES
-('Water Bottle 1.5L', '1.5L', 24, 25.00),
-('Water Bottle 0.5L', '0.5L', 48, 15.00),
-('Water Jug 5L', '5L', 4, 75.00),
-('Water Jug 10L', '10L', 2, 120.00)
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO products (name, volume, units_per_pallet, unit_price) 
+SELECT 'Water Bottle 1.5L', '1.5L', 24, 25.00
+WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Water Bottle 1.5L');
+
+INSERT INTO products (name, volume, units_per_pallet, unit_price) 
+SELECT 'Water Bottle 0.5L', '0.5L', 48, 15.00
+WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Water Bottle 0.5L');
+
+INSERT INTO products (name, volume, units_per_pallet, unit_price) 
+SELECT 'Water Jug 5L', '5L', 4, 75.00
+WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Water Jug 5L');
+
+INSERT INTO products (name, volume, units_per_pallet, unit_price) 
+SELECT 'Water Jug 10L', '10L', 2, 120.00
+WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = 'Water Jug 10L');
 
 -- Insert additional transport tariffs
 -- First, get region IDs dynamically
 INSERT INTO transport_tariffs (city, price, driver_type, region_id)
-SELECT 'Tizi Ouzou', 150.00, 'local', id FROM regions WHERE name = 'Tizi Ouzou'
-ON CONFLICT DO NOTHING;
+SELECT 'Tizi Ouzou', 150.00, 'local', id 
+FROM regions 
+WHERE name = 'Tizi Ouzou'
+AND NOT EXISTS (SELECT 1 FROM transport_tariffs WHERE city = 'Tizi Ouzou' AND driver_type = 'local');
 
 INSERT INTO transport_tariffs (city, price, driver_type, region_id)
-SELECT 'Bejaia', 200.00, 'local', id FROM regions WHERE name = 'Bejaia'
-ON CONFLICT DO NOTHING;
+SELECT 'Bejaia', 200.00, 'local', id 
+FROM regions 
+WHERE name = 'Bejaia'
+AND NOT EXISTS (SELECT 1 FROM transport_tariffs WHERE city = 'Bejaia' AND driver_type = 'local');
 
 INSERT INTO transport_tariffs (city, price, driver_type, region_id)
-SELECT 'Boumerdes', 120.00, 'local', id FROM regions WHERE name = 'Boumerdes'
-ON CONFLICT DO NOTHING;
+SELECT 'Boumerdes', 120.00, 'local', id 
+FROM regions 
+WHERE name = 'Boumerdes'
+AND NOT EXISTS (SELECT 1 FROM transport_tariffs WHERE city = 'Boumerdes' AND driver_type = 'local');
 
 INSERT INTO transport_tariffs (city, price, driver_type, region_id)
-SELECT 'Azazga', 180.00, 'factory', id FROM regions WHERE name = 'Djurdjura'
-ON CONFLICT DO NOTHING;
+SELECT 'Azazga', 180.00, 'factory', id 
+FROM regions 
+WHERE name = 'Djurdjura'
+AND NOT EXISTS (SELECT 1 FROM transport_tariffs WHERE city = 'Azazga' AND driver_type = 'factory');
 
 INSERT INTO transport_tariffs (city, price, driver_type, region_id)
-SELECT 'Mekla', 160.00, 'factory', id FROM regions WHERE name = 'Djurdjura'
-ON CONFLICT DO NOTHING;
+SELECT 'Mekla', 160.00, 'factory', id 
+FROM regions 
+WHERE name = 'Djurdjura'
+AND NOT EXISTS (SELECT 1 FROM transport_tariffs WHERE city = 'Mekla' AND driver_type = 'factory');
 
 -- Insert additional clients using dynamic region IDs
 INSERT INTO clients (name, phone, address, region_id, contact_person, status)
 SELECT 'Restaurant Le Palmier', '+213 555 123 456', '123 Avenue de la République, Tizi Ouzou', id, 'Mohamed Boudiaf', 'active'
-FROM regions WHERE name = 'Tizi Ouzou';
+FROM regions 
+WHERE name = 'Tizi Ouzou'
+AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Restaurant Le Palmier');
 
 INSERT INTO clients (name, phone, address, region_id, contact_person, status)
 SELECT 'Hotel Les Pins', '+213 555 234 567', '456 Boulevard de l''Indépendance, Bejaia', id, 'Aicha Benali', 'active'
-FROM regions WHERE name = 'Bejaia';
+FROM regions 
+WHERE name = 'Bejaia'
+AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Hotel Les Pins');
 
 INSERT INTO clients (name, phone, address, region_id, contact_person, status)
 SELECT 'Café Central', '+213 555 345 678', '789 Rue de la Paix, Boumerdes', id, 'Karim Ouali', 'active'
-FROM regions WHERE name = 'Boumerdes';
+FROM regions 
+WHERE name = 'Boumerdes'
+AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Café Central');
 
 INSERT INTO clients (name, phone, address, region_id, contact_person, status)
 SELECT 'Boulangerie Moderne', '+213 555 456 789', '321 Place du Marché, Tizi Ouzou', id, 'Fatima Zohra', 'active'
-FROM regions WHERE name = 'Tizi Ouzou';
+FROM regions 
+WHERE name = 'Tizi Ouzou'
+AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Boulangerie Moderne');
 
 INSERT INTO clients (name, phone, address, region_id, contact_person, status)
 SELECT 'Supermarket Express', '+213 555 567 890', '654 Avenue des Martyrs, Bejaia', id, 'Omar Khelil', 'active'
-FROM regions WHERE name = 'Bejaia';
+FROM regions 
+WHERE name = 'Bejaia'
+AND NOT EXISTS (SELECT 1 FROM clients WHERE name = 'Supermarket Express');
 
 -- Insert additional users using dynamic region IDs
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Ahmed Benali', 'ahmed.benali@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
-FROM regions WHERE name = 'Tizi Ouzou';
+FROM regions 
+WHERE name = 'Tizi Ouzou'
+AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'ahmed.benali@djurdjura.dz');
 
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Fatima Zohra', 'fatima.zohra@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
-FROM regions WHERE name = 'Bejaia';
+FROM regions 
+WHERE name = 'Bejaia'
+AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'fatima.zohra@djurdjura.dz');
 
 INSERT INTO users (name, email, password_hash, role, region_id, status)
 SELECT 'Omar Khelil', 'omar.khelil@djurdjura.dz', '$2b$10$rQZ8K9vL2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9uV', 'regional_manager', id, 'active'
-FROM regions WHERE name = 'Boumerdes';
+FROM regions 
+WHERE name = 'Boumerdes'
+AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'omar.khelil@djurdjura.dz');
 
 -- Insert BL numbers
 INSERT INTO bl_numbers (id, bl_number, order_id, status, created_at, updated_at) VALUES
