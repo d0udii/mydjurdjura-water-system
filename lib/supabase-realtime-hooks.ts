@@ -338,6 +338,7 @@ export function useDeleteOrder() {
 
 export function useCreateClient() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: async (clientData: any) => {
@@ -360,11 +361,23 @@ export function useCreateClient() {
         throw new Error('Address is required')
       }
 
+      // Prepare headers with authentication
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      // Add auth headers if user is available
+      if (user) {
+        headers['x-user-id'] = user.id
+        headers['x-user-email'] = user.email || ''
+        headers['x-user-role'] = user.role || 'operations'
+        headers['x-user-region-id'] = user.region_id || ''
+        headers['x-user-status'] = user.status || 'active'
+      }
+
       const response = await fetch('/api/clients', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(apiData),
       })
 
