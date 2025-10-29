@@ -1,13 +1,14 @@
 -- Clean Seed Data for Djurdjura Water System
 -- This script only includes data that can be safely inserted without hardcoded IDs
 
--- Temporarily disable activity log triggers to avoid errors during seeding
-ALTER TABLE users DISABLE TRIGGER ALL;
-ALTER TABLE regions DISABLE TRIGGER ALL;
-ALTER TABLE products DISABLE TRIGGER ALL;
-ALTER TABLE transport_tariffs DISABLE TRIGGER ALL;
-ALTER TABLE clients DISABLE TRIGGER ALL;
-ALTER TABLE orders DISABLE TRIGGER ALL;
+-- Temporarily disable user-created triggers (activity logs) to avoid errors during seeding
+-- Using USER instead of ALL to keep system triggers (foreign keys, etc.) active
+ALTER TABLE users DISABLE TRIGGER USER;
+ALTER TABLE regions DISABLE TRIGGER USER;
+ALTER TABLE products DISABLE TRIGGER USER;
+ALTER TABLE transport_tariffs DISABLE TRIGGER USER;
+ALTER TABLE clients DISABLE TRIGGER USER;
+ALTER TABLE orders DISABLE TRIGGER USER;
 
 -- Insert additional regions
 INSERT INTO regions (name, description)
@@ -132,13 +133,13 @@ FROM regions
 WHERE name = 'Boumerdes'
 AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'omar.khelil@djurdjura.dz');
 
--- Re-enable triggers after seeding
-ALTER TABLE users ENABLE TRIGGER ALL;
-ALTER TABLE regions ENABLE TRIGGER ALL;
-ALTER TABLE products ENABLE TRIGGER ALL;
-ALTER TABLE transport_tariffs ENABLE TRIGGER ALL;
-ALTER TABLE clients ENABLE TRIGGER ALL;
-ALTER TABLE orders ENABLE TRIGGER ALL;
+-- Re-enable user-created triggers after seeding
+ALTER TABLE users ENABLE TRIGGER USER;
+ALTER TABLE regions ENABLE TRIGGER USER;
+ALTER TABLE products ENABLE TRIGGER USER;
+ALTER TABLE transport_tariffs ENABLE TRIGGER USER;
+ALTER TABLE clients ENABLE TRIGGER USER;
+ALTER TABLE orders ENABLE TRIGGER USER;
 
 -- Verify data insertion
 SELECT 'Regions' as table_name, COUNT(*) as count FROM regions
