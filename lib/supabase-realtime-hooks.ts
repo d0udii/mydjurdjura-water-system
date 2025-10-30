@@ -597,21 +597,27 @@ export function useCreateTransportTariff() {
 
   return useMutation({
     mutationFn: async (tariffData: any) => {
-      const { data, error } = await supabase
-        .from('transport_tariffs')
-        .insert([tariffData])
-        .select()
-        .single()
+      console.log('🚚 Sending transport tariff to API:', tariffData)
+      
+      const response = await fetch('/api/transport', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tariffData)
+      })
 
-      if (error) throw error
-      return data
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create transport tariff')
+      }
+
+      return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transportTariffs })
       showTransportTariffSuccessToast('create')
     },
     onError: (error) => {
-      logSupabaseError('CREATE', 'Transport Tariff', error)
+      console.error('❌ Create transport tariff error:', error)
       showTransportTariffErrorToast('create', error)
     },
   })
@@ -622,22 +628,27 @@ export function useUpdateTransportTariff() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
-      const { data, error } = await supabase
-        .from('transport_tariffs')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      console.log('🔄 Updating transport tariff via API:', { id, updates })
+      
+      const response = await fetch(`/api/transport/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
 
-      if (error) throw error
-      return data
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update transport tariff')
+      }
+
+      return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.transportTariffs })
       showTransportTariffSuccessToast('update')
     },
     onError: (error) => {
-      logSupabaseError('UPDATE', 'Transport Tariff', error)
+      console.error('❌ Update transport tariff error:', error)
       showTransportTariffErrorToast('update', error)
     },
   })
