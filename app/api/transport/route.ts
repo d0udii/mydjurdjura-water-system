@@ -1,9 +1,7 @@
 import { getTransportTariffs, createTransportTariff } from "@/lib/supabase-db"
-import { initializeDatabase } from "@/lib/supabase-db"
 
 export async function GET() {
   try {
-    await initializeDatabase()
     const tariffs = await getTransportTariffs()
     return Response.json({ transport: tariffs })
   } catch (error) {
@@ -14,7 +12,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await initializeDatabase()
     const data = await request.json()
     
     console.log('📦 Received transport tariff data:', data)

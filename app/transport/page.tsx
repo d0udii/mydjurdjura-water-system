@@ -96,16 +96,17 @@ function TransportPage() {
     try {
       await createTariff.mutateAsync({
         city: addForm.city,
-        price: addForm.cost_per_pallet,
-        driver_type: 'factory',
-        region_id: '550e8400-e29b-41d4-a716-446655440001' // Default region
+        price: addForm.price,
+        driver_type: addForm.driver_type,
+        region_id: addForm.region_id
       })
       
       setIsAddDialogOpen(false)
       setAddForm({
         city: '',
-        cost_per_pallet: 0,
-        status: 'active'
+        price: 0,
+        driver_type: 'local',
+        region_id: ''
       })
       setAddErrors({})
     } catch (error) {
@@ -138,8 +139,9 @@ function TransportPage() {
         id: selectedTariff.id,
         updates: {
           city: editForm.city,
-          price: editForm.cost_per_pallet,
-          status: editForm.status
+          price: editForm.price,
+          driver_type: editForm.driver_type,
+          region_id: editForm.region_id
         }
       })
       
