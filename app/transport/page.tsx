@@ -115,11 +115,13 @@ function TransportPage() {
 
   const handleEditTariff = (tariffToEdit: TransportTariff) => {
     setSelectedTariff(tariffToEdit)
+    // Find the region name from the ID
+    const region = (regions as any[]).find((r: any) => r.id === tariffToEdit.region_id)
     setEditForm({
       city: tariffToEdit.city,
       price: tariffToEdit.price,
       driver_type: tariffToEdit.driver_type,
-      region_id: tariffToEdit.region_id
+      region_id: region?.name || tariffToEdit.region_id
     })
     setIsEditDialogOpen(true)
   }
@@ -356,8 +358,16 @@ function TransportPage() {
               required
               error={addErrors.region_id}
               value={addForm.region_id}
-              onValueChange={(value: string) => setAddForm({ ...addForm, region_id: value })}
-              options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
+              onValueChange={(value: string) => {
+                // Find the region ID based on the name
+                const region = (regions as any[]).find((r: any) => r.name === value)
+                setAddForm({ ...addForm, region_id: region?.id || value })
+              }}
+              options={[
+                { value: 'East', label: '🌅 East' },
+                { value: 'West', label: '🌄 West' },
+                { value: 'North', label: '⛰️ North' }
+              ]}
               placeholder="Select region"
             />
             <FormActions>
@@ -431,8 +441,16 @@ function TransportPage() {
               required
               error={editErrors.region_id}
               value={editForm.region_id}
-              onValueChange={(value: string) => setEditForm({ ...editForm, region_id: value })}
-              options={(regions as any[]).map((r: any) => ({ value: r.id, label: r.name }))}
+              onValueChange={(value: string) => {
+                // Find the region ID based on the name
+                const region = (regions as any[]).find((r: any) => r.name === value)
+                setEditForm({ ...editForm, region_id: region?.id || value })
+              }}
+              options={[
+                { value: 'East', label: '🌅 East' },
+                { value: 'West', label: '🌄 West' },
+                { value: 'North', label: '⛰️ North' }
+              ]}
               placeholder="Select region"
             />
             <FormActions>

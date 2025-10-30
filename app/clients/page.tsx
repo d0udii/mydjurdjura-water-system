@@ -113,11 +113,20 @@ function ClientsPage() {
   // Handle city selection - auto-populate region
   const handleCityChange = (city: string) => {
     const tariff = (transportTariffs as any[]).find((t: any) => t.city === city)
-    setFormData({
-      ...formData,
-      city,
-      region_id: tariff?.region_id || ""
-    })
+    if (tariff?.region_id) {
+      // Find region name from ID
+      const region = (regions as any[]).find((r: any) => r.id === tariff.region_id)
+      setFormData({
+        ...formData,
+        city,
+        region_id: region?.name || tariff.region_id
+      })
+    } else {
+      setFormData({
+        ...formData,
+        city
+      })
+    }
   }
 
   const resetForm = () => {
@@ -143,12 +152,16 @@ function ClientsPage() {
     }
 
     try {
+      // Convert region name to ID if needed
+      const region = (regions as any[]).find((r: any) => r.name === formData.region_id || r.id === formData.region_id)
+      const regionId = region?.id || formData.region_id
+
       await createClient.mutateAsync({
         name: formData.name,
         phone: formData.phone,
         address: formData.address,
         rc_number: formData.rc_number,
-        region_id: formData.region_id,
+        region_id: regionId,
         contact_person: formData.contact_person,
         status: formData.status
       })
@@ -189,6 +202,10 @@ function ClientsPage() {
     }
 
     try {
+      // Convert region name to ID if needed
+      const region = (regions as any[]).find((r: any) => r.name === formData.region_id || r.id === formData.region_id)
+      const regionId = region?.id || formData.region_id
+
       // Prepare old values for activity logging
       const oldValues = {
         name: selectedClient.name,
@@ -206,7 +223,7 @@ function ClientsPage() {
         phone: formData.phone,
         address: formData.address,
         rc_number: formData.rc_number,
-        region_id: formData.region_id,
+        region_id: regionId,
         contact_person: formData.contact_person,
         status: formData.status
       }
@@ -218,7 +235,7 @@ function ClientsPage() {
           phone: formData.phone,
           address: formData.address,
           rc_number: formData.rc_number,
-          region_id: formData.region_id,
+          region_id: regionId,
           contact_person: formData.contact_person,
           status: formData.status
         }
