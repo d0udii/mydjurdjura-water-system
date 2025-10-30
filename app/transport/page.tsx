@@ -94,12 +94,26 @@ function TransportPage() {
     }
 
     try {
-      await createTariff.mutateAsync({
+      // Convert region name to ID if needed
+      const region = (regions as any[]).find((r: any) => r.name === addForm.region_id || r.id === addForm.region_id)
+      const regionId = region?.id || addForm.region_id
+
+      console.log('🚀 Creating tariff with data:', {
         city: addForm.city,
         price: addForm.price,
         driver_type: addForm.driver_type,
-        region_id: addForm.region_id
+        region_id: regionId,
+        region_name: region?.name
       })
+
+      const result = await createTariff.mutateAsync({
+        city: addForm.city,
+        price: addForm.price,
+        driver_type: addForm.driver_type,
+        region_id: regionId
+      })
+      
+      console.log('✅ Tariff created successfully:', result)
       
       setIsAddDialogOpen(false)
       setAddForm({
@@ -109,8 +123,11 @@ function TransportPage() {
         region_id: ''
       })
       setAddErrors({})
+      
+      // Force a refresh to show the new tariff
+      window.location.reload()
     } catch (error) {
-      console.error('Error creating transport tariff:', error)
+      console.error('❌ Error creating transport tariff:', error)
     }
   }
 
@@ -135,19 +152,26 @@ function TransportPage() {
     }
 
     try {
+      // Convert region name to ID if needed
+      const region = (regions as any[]).find((r: any) => r.name === editForm.region_id || r.id === editForm.region_id)
+      const regionId = region?.id || editForm.region_id
+
       await updateTariff.mutateAsync({
         id: selectedTariff.id,
         updates: {
           city: editForm.city,
           price: editForm.price,
           driver_type: editForm.driver_type,
-          region_id: editForm.region_id
+          region_id: regionId
         }
       })
       
       setIsEditDialogOpen(false)
       setSelectedTariff(null)
       setEditErrors({})
+      
+      // Force a refresh to show the updated tariff
+      window.location.reload()
     } catch (error) {
       console.error('Error updating transport tariff:', error)
     }
