@@ -128,6 +128,7 @@ function TransportPage() {
       window.location.reload()
     } catch (error) {
       console.error('❌ Error creating transport tariff:', error)
+      alert(`Failed to create tariff: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
